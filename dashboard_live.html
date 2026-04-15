@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AeroShield | Live Ground Control Station</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,200..900&family=JetBrains+Mono:wght@200..800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   DESIGN TOKENS — Linear / Deep Space
+═══════════════════════════════════════════════════════════ */
+:root {
+    --bg-deep:     #020203;
+    --bg-base:     #050506;
+    --bg-elevated: #0a0a0c;
+    --surface:     rgba(255,255,255,0.035);
+    --surface-h:   rgba(255,255,255,0.065);
+    --accent:      #5E6AD2;
+    --accent-b:    #6872D9;
+    --accent-glow: rgba(94,106,210,0.25);
+    --fg:          #EDEDEF;
+    --muted:       #8A8F98;
+    --border:      rgba(255,255,255,0.055);
+    --border-top:  rgba(255,255,255,0.11);
+    --danger:      #EF4444;
+    --success:     #10B981;
+    --warn:        #F59E0B;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+    background: var(--bg-base);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+    letter-spacing: -0.01em;
+}
+
+/* ── Background Stack ─────────────────────────────────────── */
+#bg {
+    position: fixed; inset: 0; z-index: -20;
+    background: radial-gradient(circle at 50% -10%, #12122a 0%, #050506 55%, #020203 100%);
+}
+.grid-layer {
+    position: fixed; inset: 0; z-index: -15; pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse at 50% 40%, white 10%, transparent 75%);
+}
+.noise-layer {
+    position: fixed; inset: 0; z-index: -10; opacity: 0.018; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.blob-1 {
+    position: fixed; z-index: -12; pointer-events: none; border-radius: 50%;
+    width: 900px; height: 500px;
+    top: -200px; left: 50%; transform: translateX(-50%);
+    background: rgba(94,106,210,0.18);
+    filter: blur(130px);
+    animation: blob-float 16s ease-in-out infinite;
+}
+.blob-2 {
+    position: fixed; z-index: -12; pointer-events: none; border-radius: 50%;
+    width: 500px; height: 500px;
+    bottom: 0; right: -150px;
+    background: rgba(99,60,200,0.1);
+    filter: blur(100px);
+    animation: blob-float 22s ease-in-out infinite reverse;
+}
+@keyframes blob-float {
+    0%,100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) translateY(-30px) scale(1.05); }
+}
+
+/* ── Card ─────────────────────────────────────────────────── */
+.card {
+    background: linear-gradient(175deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid var(--border);
+    border-top-color: var(--border-top);
+    border-radius: 14px;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16,1,0.3,1);
+    position: relative;
+    overflow: hidden;
+}
+.card:hover {
+    border-color: rgba(255,255,255,0.1);
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,0.06),
+        0 8px 40px rgba(0,0,0,0.35),
+        0 0 60px var(--accent-glow);
+}
+
+/* spotlight */
+.card::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(400px circle at var(--mx,50%) var(--my,50%), rgba(94,106,210,0.09), transparent 40%);
+    opacity: 0; transition: opacity 0.5s ease; border-radius: inherit;
+}
+.card:hover::after { opacity: 1; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn-accent {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent);
+    color: #fff; border: none; cursor: pointer;
+    padding: 9px 18px; border-radius: 10px;
+    font: 600 11px/1 'Inter', sans-serif; letter-spacing: 0.04em; text-transform: uppercase;
+    box-shadow: 0 0 0 1px rgba(94,106,210,0.5), 0 0 30px -8px rgba(94,106,210,0.7), inset 0 1px 0 rgba(255,255,255,0.18);
+    transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+    position: relative; overflow: hidden;
+}
+.btn-accent::before {
+    content: ""; position: absolute;
+    top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    animation: shimmer 5s infinite;
+}
+.btn-accent:hover { background: var(--accent-b); transform: scale(1.02); }
+.btn-accent:active { transform: scale(0.97); }
+.btn-accent:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.btn-danger {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); cursor: pointer;
+    padding: 9px 18px; border-radius: 10px;
+    font: 600 11px/1 'Inter', sans-serif; letter-spacing: 0.04em; text-transform: uppercase;
+    transition: all 0.2s ease;
+}
+.btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+.btn-ghost {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface); color: var(--muted); border: 1px solid var(--border); cursor: pointer;
+    padding: 8px 14px; border-radius: 9px;
+    font: 500 10px/1 'Inter', sans-serif; letter-spacing: 0.06em; text-transform: uppercase;
+    transition: all 0.2s ease;
+}
+.btn-ghost:hover { background: var(--surface-h); color: var(--fg); }
+.btn-ghost.active { background: rgba(94,106,210,0.15); color: var(--accent); border-color: rgba(94,106,210,0.3); }
+
+@keyframes shimmer { 0%{left:-100%} 20%,100%{left:100%} }
+
+/* ── Tag / Badge ─────────────────────────────────────────── */
+.tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font: 700 9px/1 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 4px 8px; border-radius: 6px;
+}
+.tag-accent { background: rgba(94,106,210,0.12); color: var(--accent); border: 1px solid rgba(94,106,210,0.25); }
+.tag-green  { background: rgba(16,185,129,0.1);  color: #34d399;       border: 1px solid rgba(16,185,129,0.25); }
+.tag-red    { background: rgba(239,68,68,0.1);   color: #f87171;       border: 1px solid rgba(239,68,68,0.25); }
+.tag-yellow { background: rgba(245,158,11,0.1);  color: #fbbf24;       border: 1px solid rgba(245,158,11,0.25); }
+
+/* ── Layout ──────────────────────────────────────────────── */
+nav {
+    height: 64px; border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(20px) saturate(1.4);
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px;
+}
+.nav-logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: var(--accent);
+    display: grid; place-items: center;
+    box-shadow: 0 0 20px rgba(94,106,210,0.45);
+    font-size: 14px; color: #fff;
+}
+
+main {
+    max-width: 1440px; margin: 0 auto; padding: 28px 28px 48px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 340px;
+    grid-template-rows: auto auto auto;
+    gap: 20px;
+}
+
+/* ── Control Panel — spans all 4 cols ──────────────────── */
+#ctrl-bar {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 24px;
+    flex-wrap: wrap;
+}
+#ctrl-bar .sep { width: 1px; height: 36px; background: var(--border); flex-shrink: 0; }
+#ctrl-bar select {
+    appearance: none;
+    background: var(--surface); border: 1px solid var(--border); color: var(--fg);
+    padding: 8px 32px 8px 12px; border-radius: 9px;
+    font: 500 12px/1 'Inter', sans-serif; cursor: pointer; outline: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238A8F98'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; background-size: 14px;
+    transition: border-color 0.2s ease;
+}
+#ctrl-bar select:hover { border-color: rgba(255,255,255,0.15); }
+.ctrl-group { display: flex; flex-direction: column; gap: 5px; }
+.ctrl-label { font: 700 9px/1 'JetBrains Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+/* ── Visualizer — 3 cols ─────────────────────────────────── */
+#visualizer {
+    grid-column: 1 / 4;
+    height: 520px;
+    display: flex; flex-direction: column;
+}
+.vis-inner { flex: 1; position: relative; overflow: hidden; border-radius: 12px; }
+
+/* horizon grid */
+.horizon-grid {
+    position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    opacity: 0.07;
+    background-image:
+        linear-gradient(rgba(255,255,255,1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px);
+    background-size: 80px 60px;
+    transition: transform 0.1s linear;
+}
+
+/* aircraft stage */
+.aircraft-stage {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+}
+.aircraft-wrap {
+    transition: transform 0.12s cubic-bezier(0.16,1,0.3,1);
+    filter: drop-shadow(0 0 40px rgba(94,106,210,0.35)) drop-shadow(0 20px 40px rgba(0,0,0,0.6));
+}
+
+/* HUD overlays */
+.hud-tl, .hud-tr, .hud-bl, .hud-br {
+    position: absolute; z-index: 10; display: flex; flex-direction: column; gap: 6px;
+}
+.hud-tl { top: 20px; left: 20px; }
+.hud-tr { top: 20px; right: 20px; text-align: right; }
+.hud-bl { bottom: 20px; left: 20px; }
+.hud-br { bottom: 20px; right: 20px; text-align: right; }
+
+.hud-label { font: 700 8px/1 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.3); }
+.hud-value { font: 700 20px/1 'JetBrains Mono', monospace; color: #fff; letter-spacing: -0.02em; }
+.hud-value.danger { color: var(--danger); text-shadow: 0 0 20px rgba(239,68,68,0.5); }
+.hud-value.warn   { color: var(--warn); }
+
+/* Wind indicator */
+.wind-bar-container {
+    display: flex; align-items: center; gap: 6px;
+}
+.wind-bar-track {
+    width: 90px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: visible;
+    position: relative;
+}
+.wind-center { position: absolute; left: 50%; top: 50%; width: 1px; height: 7px; background: rgba(255,255,255,0.2); transform: translate(-50%,-50%); }
+.wind-fill {
+    height: 100%; border-radius: 99px;
+    position: absolute; top: 0;
+    transition: all 0.3s ease;
+}
+
+/* alt tape */
+.alt-tape {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 60px;
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+    gap: 0; z-index: 8;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.25));
+}
+.alt-tick {
+    font: 500 8px/1 'JetBrains Mono', monospace; color: rgba(255,255,255,0.2);
+    display: flex; align-items: center; gap: 5px; padding: 0 12px 0 0;
+}
+.alt-tick::after { content: ""; display: block; width: 8px; height: 1px; background: rgba(255,255,255,0.15); }
+.alt-pointer {
+    position: absolute; right: 0; display: flex; align-items: center; gap: 4px;
+    transition: top 0.3s ease; transform: translateY(-50%);
+}
+.alt-ptr-val { font: 700 10px/1 'JetBrains Mono', monospace; color: var(--accent); }
+.alt-ptr-tri {
+    width: 0; height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-right: 8px solid var(--accent);
+}
+
+/* stall overlay */
+.stall-overlay {
+    position: absolute; inset: 0; z-index: 20; pointer-events: none;
+    border-radius: inherit;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s ease;
+}
+.stall-overlay.visible { opacity: 1; animation: stall-pulse 0.8s ease-in-out infinite alternate; }
+@keyframes stall-pulse {
+    from { background: rgba(239,68,68,0.06); border: 2px solid rgba(239,68,68,0.2); }
+    to   { background: rgba(239,68,68,0.14); border: 2px solid rgba(239,68,68,0.5); }
+}
+.stall-badge {
+    background: rgba(239,68,68, 0.9); color: #fff;
+    font: 900 13px/1 'Inter', sans-serif; letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 12px 28px; border-radius: 10px;
+    box-shadow: 0 0 80px rgba(239,68,68,0.6);
+}
+
+/* ── Log panel — col 4 ───────────────────────────────────── */
+#log-panel {
+    grid-column: 4;
+    grid-row: 2 / 4;
+    display: flex; flex-direction: column;
+    max-height: 760px;
+}
+.log-scroll {
+    flex: 1; overflow-y: auto; padding: 16px;
+    font: 400 10px/1.6 'JetBrains Mono', monospace;
+    display: flex; flex-direction: column-reverse;
+    gap: 6px;
+}
+.log-scroll::-webkit-scrollbar { width: 4px; }
+.log-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+.log-entry {
+    padding: 5px 8px 5px 10px; border-radius: 5px;
+    border-left: 2px solid;
+    background: rgba(255,255,255,0.02);
+    animation: log-in 0.2s ease;
+}
+@keyframes log-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+.log-entry.info  { border-color: var(--accent); color: rgba(148,163,184,0.9); }
+.log-entry.warn  { border-color: var(--warn);   color: rgba(251,191,36,0.9); }
+.log-entry.error { border-color: var(--danger); color: rgba(248,113,113,0.9); }
+.log-entry.ok    { border-color: var(--success);  color: rgba(52,211,153,0.9); }
+.log-time { color: rgba(255,255,255,0.2); font-size: 9px; margin-right: 6px; }
+
+/* ── Charts row ──────────────────────────────────────────── */
+.chart-card { flex: 1; padding: 20px 22px 18px; }
+.chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.chart-title { font: 700 9px/1 'JetBrains Mono', monospace; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.chart-val { font: 600 14px/1 'JetBrains Mono', monospace; color: var(--fg); }
+.chart-wrap { height: 130px; }
+
+/* ── Stats row ───────────────────────────────────────────── */
+#stats-row {
+    grid-column: 1 / 4;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+}
+.stat-card { padding: 20px; }
+.stat-label { font: 700 8px/1 'JetBrains Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.stat-val { font: 300 34px/1 'Inter', sans-serif; letter-spacing: -0.04em; color: var(--fg); }
+.stat-val sup { font-size: 12px; color: var(--accent); }
+
+/* progress ring */
+.ring-wrap { display: flex; align-items: center; gap: 12px; }
+.ring-svg { transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: rgba(255,255,255,0.05); }
+.ring-fg { fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
+
+/* ── Footer ──────────────────────────────────────────────── */
+footer {
+    max-width: 1440px; margin: 0 auto; padding: 24px 28px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    flex-wrap: wrap;
+}
+footer span { font: 400 10px/1 'JetBrains Mono', monospace; color: rgba(255,255,255,0.2); }
+
+/* ── Connection status bar ───────────────────────────────── */
+#conn-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 99px; font: 700 9px/1 'JetBrains Mono', monospace; letter-spacing: 0.12em;
+    border: 1px solid;
+    transition: all 0.3s ease;
+}
+#conn-pill.waiting  { color: var(--muted);   border-color: rgba(255,255,255,0.1);        background: rgba(255,255,255,0.03); }
+#conn-pill.live     { color: #34d399;         border-color: rgba(16,185,129,0.3);         background: rgba(16,185,129,0.07); }
+#conn-pill.error    { color: #f87171;         border-color: rgba(239,68,68,0.3);          background: rgba(239,68,68,0.07); }
+#conn-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+#conn-pill.live .dot { animation: blink 1.2s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
+
+/* ── Animations ──────────────────────────────────────────── */
+.reveal { animation: reveal 0.6s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes reveal { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none;} }
+.reveal-1 { animation-delay: 0.05s; }
+.reveal-2 { animation-delay: 0.12s; }
+.reveal-3 { animation-delay: 0.20s; }
+.reveal-4 { animation-delay: 0.28s; }
+</style>
+</head>
+<body>
+
+<!-- Background -->
+<div id="bg"></div>
+<div class="grid-layer"></div>
+<div class="noise-layer"></div>
+<div class="blob-1"></div>
+<div class="blob-2"></div>
+
+<!-- ════════════ NAV ═══════════════════════════════════════ -->
+<nav>
+    <div class="nav-logo">
+        <div class="logo-icon"><i class="fas fa-microchip"></i></div>
+        <div>
+            <div style="font:700 13px/1 'Inter';letter-spacing:-0.01em;color:#fff">AEROSHIELD</div>
+            <div style="font:500 9px/1 'JetBrains Mono';letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-top:3px">Live Ground Control Station</div>
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+        <div id="conn-pill" class="waiting">
+            <div class="dot"></div>
+            <span id="conn-text">DISCONNECTED</span>
+        </div>
+        <button id="btn-sim" class="btn-accent" onclick="startSim()">
+            <i class="fas fa-satellite-dish"></i> Launch Simulation
+        </button>
+        <button id="btn-stop" class="btn-danger" onclick="stopSim()" style="display:none">
+            <i class="fas fa-stop"></i> Abort
+        </button>
+    </div>
+</nav>
+
+<!-- ════════════ MAIN GRID ════════════════════════════════ -->
+<main>
+
+    <!-- CONTROL BAR -->
+    <div id="ctrl-bar" class="card p-4 reveal">
+        <div class="ctrl-group">
+            <span class="ctrl-label">Mission Profile</span>
+            <select id="sel-scenario">
+                <option value="normal">Atmospheric Stability (L3)</option>
+                <option value="climb">High-Alpha Climb (L5)</option>
+                <option value="stall">Neural Stress Test (CRIT)</option>
+            </select>
+        </div>
+        <div class="sep"></div>
+        <div class="ctrl-group">
+            <span class="ctrl-label">Autonomous Assist</span>
+            <div style="display:flex;gap:6px">
+                <button class="btn-ghost active" id="btn-ai-on"  onclick="setAI(true)">AI Enabled</button>
+                <button class="btn-ghost"         id="btn-ai-off" onclick="setAI(false)">Manual</button>
+            </div>
+        </div>
+        <div class="sep"></div>
+        <div class="ctrl-group">
+            <span class="ctrl-label">Wind Turbulence</span>
+            <div style="display:flex;gap:6px">
+                <button class="btn-ghost active" id="btn-w-mod" onclick="setWind('moderate')">Moderate</button>
+                <button class="btn-ghost"         id="btn-w-sev" onclick="setWind('severe')">Severe</button>
+                <button class="btn-ghost"         id="btn-w-off" onclick="setWind('off')">Calm</button>
+            </div>
+        </div>
+        <div class="sep" style="margin-left:auto"></div>
+        <div class="ctrl-group" style="text-align:right">
+            <span class="ctrl-label">Mission Elapsed Time</span>
+            <span id="met" style="font:700 22px/1 'JetBrains Mono';color:#fff;letter-spacing:-0.02em">T+ 00.00 S</span>
+        </div>
+    </div>
+
+    <!-- VISUALIZER -->
+    <div id="visualizer" class="card reveal reveal-1">
+        <div class="vis-inner">
+            <!-- Horizon pitch grid -->
+            <div class="horizon-grid" id="hgrid"></div>
+
+            <!-- HUD: Top Left -->
+            <div class="hud-tl">
+                <span class="tag tag-accent" id="tag-mode">AI ENABLED</span>
+                <div style="margin-top:4px">
+                    <div class="hud-label">Pitch Angle</div>
+                    <div class="hud-value" id="hud-pitch">0.00°</div>
+                </div>
+                <div>
+                    <div class="hud-label">AoA</div>
+                    <div class="hud-value" id="hud-aoa">0.00°</div>
+                </div>
+            </div>
+
+            <!-- HUD: Top Right -->
+            <div class="hud-tr">
+                <div>
+                    <div class="hud-label">Airspeed</div>
+                    <div class="hud-value" id="hud-vel">15.0 m/s</div>
+                </div>
+                <div>
+                    <div class="hud-label">Throttle</div>
+                    <div class="hud-value" id="hud-thr">50%</div>
+                </div>
+            </div>
+
+            <!-- HUD: Bottom Left — Wind -->
+            <div class="hud-bl">
+                <div class="hud-label">Wind Gust (Dryden u_g)</div>
+                <div class="wind-bar-container">
+                    <span style="font:600 10px/1 'JetBrains Mono';color:var(--muted)" id="wind-val">0.0</span>
+                    <div class="wind-bar-track" id="wind-track">
+                        <div class="wind-center"></div>
+                        <div class="wind-fill" id="wind-fill"></div>
+                    </div>
+                    <span style="font:500 9px/1 'JetBrains Mono';color:var(--muted)">m/s</span>
+                </div>
+            </div>
+
+            <!-- HUD: Bottom Right — Stall prob -->
+            <div class="hud-br">
+                <div class="hud-label">Stall Probability</div>
+                <div class="hud-value" id="hud-prob">0%</div>
+            </div>
+
+            <!-- Aircraft -->
+            <div class="aircraft-stage">
+                <div class="aircraft-wrap" id="acwrap">
+                    <svg width="360" height="120" viewBox="0 0 400 120">
+                        <g transform="translate(0,8)">
+                            <!-- tail fins -->
+                            <path d="M333,37 L389,1 L400,1 L377,44 Z" fill="#1e293b"/>
+                            <path d="M333,37 L389,1 L394,1 L377,42 Z" fill="#5E6AD2"/>
+                            <!-- fuselage -->
+                            <path d="M38,63 Q38,40 118,40 L342,46 Q377,46 377,63 L377,72 Q377,89 322,84 L48,84 Q38,84 38,63Z" fill="#f1f5f9"/>
+                            <path d="M38,63 Q38,50 118,50 L342,55 Q362,55 362,63 L362,69 Q362,77 322,76 L48,76 Q38,76 38,63Z" fill="#fff" opacity="0.35"/>
+                            <!-- wing -->
+                            <path d="M118,63 L242,114 L288,114 L192,63Z" fill="#2d3955"/>
+                            <path d="M128,63 L242,110 L278,110 L192,63Z" fill="#5E6AD2"/>
+                            <!-- cockpit -->
+                            <path d="M73,52 Q105,24 158,52Z" fill="#0f172a" opacity="0.85"/>
+                            <path d="M87,52 Q105,36 138,52Z" fill="#fff" opacity="0.08"/>
+                            <!-- engine -->
+                            <rect x="143" y="76" width="68" height="17" rx="6" fill="#1e293b"/>
+                            <rect x="148" y="80" width="58" height="9" rx="3" fill="#5E6AD2" opacity="0.25"/>
+                            <!-- engine glow -->
+                            <circle cx="207" cy="85" r="3.5" fill="#5E6AD2" opacity="0.6"/>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Altitude tape -->
+            <div class="alt-tape">
+                <div class="alt-tick" style="position:absolute;top:10%">150m</div>
+                <div class="alt-tick" style="position:absolute;top:32%">125m</div>
+                <div class="alt-tick" style="position:absolute;top:54%">100m</div>
+                <div class="alt-tick" style="position:absolute;top:76%">75m</div>
+                <div class="alt-pointer" id="alt-ptr" style="top:54%">
+                    <div class="alt-ptr-val" id="alt-ptr-val">100m</div>
+                    <div class="alt-ptr-tri"></div>
+                </div>
+            </div>
+
+            <!-- Critical stall overlay -->
+            <div class="stall-overlay" id="stall-overlay">
+                <div class="stall-badge">
+                    <i class="fas fa-exclamation-triangle" style="margin-right:8px;animation:blink 0.5s infinite"></i>
+                    CRITICAL STALL
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOG PANEL -->
+    <div id="log-panel" class="card reveal reveal-2">
+        <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <span style="font:700 9px/1 'JetBrains Mono';letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)">Neural Flight Log</span>
+            <span style="font:600 9px/1 'JetBrains Mono';color:var(--accent)" id="log-count">0 EVENTS</span>
+        </div>
+        <div class="log-scroll" id="log-scroll"></div>
+    </div>
+
+    <!-- CHARTS -->
+    <div style="grid-column:1/4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px" class="reveal reveal-3">
+        <div class="card chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Pitch Trajectory</span>
+                <span class="chart-val" id="cv-pitch">0.00°</span>
+            </div>
+            <div class="chart-wrap"><canvas id="c-pitch"></canvas></div>
+        </div>
+        <div class="card chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Airspeed (m/s)</span>
+                <span class="chart-val" id="cv-vel">0.0</span>
+            </div>
+            <div class="chart-wrap"><canvas id="c-vel"></canvas></div>
+        </div>
+        <div class="card chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Wind Gust u_g (m/s)</span>
+                <span class="chart-val" id="cv-wind">0.0</span>
+            </div>
+            <div class="chart-wrap"><canvas id="c-wind"></canvas></div>
+        </div>
+    </div>
+
+    <!-- STATS ROW -->
+    <div id="stats-row" class="reveal reveal-4">
+        <div class="card stat-card">
+            <div class="stat-label">Stall Events</div>
+            <div class="stat-val"><span id="s-stalls">0</span><sup> count</sup></div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-label">Peak Stall Probability</div>
+            <div class="stat-val"><span id="s-peakp">0</span><sup>%</sup></div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-label">Min Altitude</div>
+            <div class="stat-val"><span id="s-alt">100</span><sup>m</sup></div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-label">Stall Prevention</div>
+            <div class="ring-wrap">
+                <svg width="56" height="56" class="ring-svg">
+                    <circle class="ring-bg" r="24" cx="28" cy="28" stroke-width="4"/>
+                    <circle class="ring-fg" id="ring-fg" r="24" cx="28" cy="28" stroke-width="4"
+                        stroke="var(--accent)"
+                        stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
+                </svg>
+                <div>
+                    <div class="stat-val" style="font-size:24px"><span id="s-prevent">—</span><sup style="font-size:9px">%</sup></div>
+                    <div class="stat-label" style="margin-top:4px">effectiveness</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    <span>AeroShield v4.2 — RF_STALL_50T · MIL-F-8785C Dryden Wind · Real-time WebSocket</span>
+    <span style="display:flex;gap:16px">
+        <span>99.1% Accuracy</span>
+        <span>·</span>
+        <span id="fps-counter">— fps</span>
+    </span>
+</footer>
+
+<!-- ════════════ JAVASCRIPT ════════════════════════════════ -->
+<script>
+/* ── State ─────────────────────────────────────────────── */
+let ws = null;
+let cfg = { scenario:'normal', ai:true, wind:'moderate' };
+let stats = { stalls:0, peakProb:0, minAlt:999, totalFrames:0, stalls_off_ref:0 };
+let charts = {};
+let logCount = 0;
+let fpsFrames = 0; let fpsLast = 0;
+let prevAlt = null;   // track for AI-off comparison proxy
+
+const CHART_LEN = 150;
+
+/* ── Chart init ────────────────────────────────────────── */
+function mkChart(id, color, fill) {
+    const ctx = document.getElementById(id).getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 130);
+    grad.addColorStop(0, color.replace(')', ',0.15)').replace('rgb', 'rgba'));
+    grad.addColorStop(1, 'transparent');
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array(CHART_LEN).fill(''),
+            datasets: [{ data: Array(CHART_LEN).fill(null), borderColor: color, borderWidth: 1.8,
+                fill: true, backgroundColor: fill ? grad : 'transparent',
+                pointRadius: 0, tension: 0.38 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { grid: { color:'rgba(255,255,255,0.025)', drawBorder:false },
+                     ticks: { color:'#4B5563', font:{ size:8, family:'JetBrains Mono' } } }
+            },
+            elements: { line: { tension: 0.38 } }
+        }
+    });
+}
+
+function pushChart(chart, val) {
+    chart.data.datasets[0].data.push(val);
+    chart.data.datasets[0].data.shift();
+    chart.update('none');
+}
+
+/* ── Spotlight handler ─────────────────────────────────── */
+document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+        card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    });
+});
+
+/* ── UI helpers ───────────────────────────────────────── */
+function setConn(state, label) {
+    const el = document.getElementById('conn-pill');
+    el.className = 'conn-pill ' + state;
+    document.getElementById('conn-text').textContent = label;
+}
+function setConn(state, label) {
+    const el = document.getElementById('conn-pill');
+    el.className = state;
+    document.getElementById('conn-text').textContent = label;
+}
+
+function log(msg, type='info', t=null) {
+    const scroll = document.getElementById('log-scroll');
+    const div = document.createElement('div');
+    div.className = `log-entry ${type}`;
+    const ts = t !== null ? `${t.toFixed(2)}s` : new Date().toISOString().slice(11,19);
+    div.innerHTML = `<span class="log-time">${ts}</span>${msg}`;
+    scroll.prepend(div);
+    logCount++;
+    document.getElementById('log-count').textContent = `${logCount} EVENTS`;
+    if (scroll.children.length > 200) scroll.removeChild(scroll.lastChild);
+}
+
+function setAI(val) {
+    cfg.ai = val;
+    document.getElementById('btn-ai-on').classList.toggle('active', val);
+    document.getElementById('btn-ai-off').classList.toggle('active', !val);
+    const tag = document.getElementById('tag-mode');
+    tag.textContent = val ? 'AI ENABLED' : 'MANUAL FLIGHT';
+    tag.className = val ? 'tag tag-accent' : 'tag tag-yellow';
+}
+
+function setWind(val) {
+    cfg.wind = val;
+    ['mod','sev','off'].forEach(k => {
+        document.getElementById(`btn-w-${k}`).classList.remove('active');
+    });
+    const map = {moderate:'mod', severe:'sev', off:'off'};
+    document.getElementById(`btn-w-${map[val]}`).classList.add('active');
+}
+
+/* ── Frame rendering ──────────────────────────────────── */
+function renderFrame(d) {
+    const prob = d.stall_prob;
+    const pitch = d.pitch;
+    const vel = d.velocity;
+    const alt = d.altitude;
+    const wind = d.wind_u;
+    const t = d.t;
+
+    // Aircraft tilt
+    document.getElementById('acwrap').style.transform = `rotate(${-pitch}deg)`;
+    document.getElementById('hgrid').style.transform = `translateY(${pitch * 3}px) rotate(${pitch * 0.15}deg)`;
+
+    // HUD
+    const isProbHigh = prob > 0.7;
+    document.getElementById('hud-pitch').textContent = `${pitch.toFixed(2)}°`;
+    document.getElementById('hud-pitch').className = `hud-value ${Math.abs(pitch) > 14 ? 'danger' : ''}`;
+    document.getElementById('hud-aoa').textContent   = `${d.aoa.toFixed(2)}°`;
+    document.getElementById('hud-vel').textContent   = `${vel.toFixed(1)} m/s`;
+    document.getElementById('hud-thr').textContent   = `${(d.throttle * 100).toFixed(0)}%`;
+    document.getElementById('hud-prob').textContent  = `${(prob * 100).toFixed(0)}%`;
+    document.getElementById('hud-prob').className = `hud-value ${isProbHigh ? 'danger' : ''}`;
+    document.getElementById('met').textContent = `T+ ${t.toFixed(2)} S`;
+
+    // Wind bar (centered, -20 to +20 range)
+    const wPct = wind / 20;  // -1 to 1
+    const track = document.getElementById('wind-track');
+    const fill = document.getElementById('wind-fill');
+    const tw = track.offsetWidth;
+    if (wPct >= 0) {
+        fill.style.left = '50%'; fill.style.width = `${Math.min(wPct * 50, 50)}%`;
+        fill.style.background = '#F59E0B';
+    } else {
+        fill.style.left = `${Math.max(50 + wPct * 50, 0)}%`;
+        fill.style.width = `${Math.min(-wPct * 50, 50)}%`;
+        fill.style.background = '#60A5FA';
+    }
+    document.getElementById('wind-val').textContent = wind.toFixed(1);
+
+    // Altitude tape
+    const altFrac = 1.0 - Math.min(Math.max((alt - 60) / 100, 0), 1);
+    document.getElementById('alt-ptr').style.top = `${altFrac * 88 + 6}%`;
+    document.getElementById('alt-ptr-val').textContent = `${alt.toFixed(0)}m`;
+
+    // Stall overlay
+    document.getElementById('stall-overlay').classList.toggle('visible', !!d.stalled);
+
+    // Charts
+    pushChart(charts.pitch, pitch);
+    pushChart(charts.vel, vel);
+    pushChart(charts.wind, wind);
+
+    // Chart value display
+    document.getElementById('cv-pitch').textContent = `${pitch.toFixed(2)}°`;
+    document.getElementById('cv-vel').textContent = vel.toFixed(1);
+    document.getElementById('cv-wind').textContent = wind.toFixed(2);
+
+    // Live stats
+    if (d.stalled) stats.stalls++;
+    if (prob > stats.peakProb) { stats.peakProb = prob; document.getElementById('s-peakp').textContent = (prob*100).toFixed(0); }
+    if (alt < stats.minAlt)    { stats.minAlt = alt;    document.getElementById('s-alt').textContent = alt.toFixed(1); }
+    document.getElementById('s-stalls').textContent = stats.stalls;
+
+    // FPS
+    stats.totalFrames++;
+    const now = performance.now();
+    if (now - fpsLast >= 1000) {
+        document.getElementById('fps-counter').textContent = `${fpsFrames} fps`;
+        fpsFrames = 0; fpsLast = now;
+    }
+    fpsFrames++;
+
+    // Log notable events
+    if (isProbHigh && Math.round(t * 10) % 6 === 0) {
+        log(`AI intervention: prob=${(prob*100).toFixed(0)}%, elevator suppressed.`, 'warn', t);
+    }
+    if (d.stalled && Math.round(t * 10) % 8 === 0) {
+        log('STALL CONDITION ACTIVE — AoA exceeds critical angle.', 'error', t);
+    }
+    if (Math.abs(wind) > 6 && Math.round(t * 10) % 10 === 0) {
+        log(`Strong Dryden gust: u_g = ${wind.toFixed(1)} m/s`, 'info', t);
+    }
+}
+
+/* ── Sim control ──────────────────────────────────────── */
+function startSim() {
+    if (ws && ws.readyState < 2) ws.close();
+
+    // Reset stats
+    stats = { stalls:0, peakProb:0, minAlt:999, totalFrames:0 };
+    document.getElementById('s-stalls').textContent = '0';
+    document.getElementById('s-peakp').textContent = '0';
+    document.getElementById('s-alt').textContent = '100';
+    document.getElementById('s-prevent').textContent = '—';
+    document.getElementById('ring-fg').style.strokeDashoffset = 150.8;
+    document.getElementById('log-scroll').innerHTML = '';
+    logCount = 0;
+    document.getElementById('log-count').textContent = '0 EVENTS';
+
+    // Reset charts
+    [charts.pitch, charts.vel, charts.wind].forEach(c => {
+        c.data.datasets[0].data = Array(CHART_LEN).fill(null);
+        c.update('none');
+    });
+
+    setConn('live', 'CONNECTING…');
+    log('Requesting live simulation from AeroShield server…', 'info');
+
+    ws = new WebSocket('ws://localhost:8765/ws/simulate');
+
+    ws.onopen = () => {
+        setConn('live', 'LIVE');
+        document.getElementById('btn-sim').style.display = 'none';
+        document.getElementById('btn-stop').style.display = '';
+        log(`Mission started — scenario:${cfg.scenario}  AI:${cfg.ai}  wind:${cfg.wind}`, 'ok');
+        ws.send(JSON.stringify({ scenario: cfg.scenario, ai_enabled: cfg.ai, wind: cfg.wind }));
+    };
+
+    ws.onmessage = e => {
+        const d = JSON.parse(e.data);
+        if (d.type === 'frame') {
+            renderFrame(d);
+        } else if (d.type === 'ready') {
+            log(`Server ready — RF_STALL_50T initialized.`, 'ok');
+        } else if (d.type === 'done') {
+            const pct = cfg.ai ? 100 : 0;  // meaningful only when compared
+            document.getElementById('s-prevent').textContent = cfg.ai ? '100' : '—';
+            const circ = 2 * Math.PI * 24;
+            document.getElementById('ring-fg').style.strokeDashoffset = `${circ * (1 - (cfg.ai ? 1 : 0))}`;
+            log(`Simulation complete — ${d.stall_count} stall events in ${d.duration}s.`, 'ok');
+            endSim();
+        } else if (d.type === 'error') {
+            log(`Server error: ${d.message}`, 'error');
+            endSim();
+        }
+    };
+
+    ws.onerror = () => {
+        setConn('error', 'ERROR');
+        log('WebSocket connection failed. Is server.py running?', 'error');
+        endSim();
+    };
+
+    ws.onclose = () => {
+        if (document.getElementById('btn-stop').style.display !== 'none') endSim();
+    };
+}
+
+function stopSim() {
+    if (ws) ws.close();
+    log('Simulation aborted by operator.', 'warn');
+    endSim();
+}
+
+function endSim() {
+    setConn('waiting', 'STANDBY');
+    document.getElementById('btn-sim').style.display = '';
+    document.getElementById('btn-stop').style.display = 'none';
+    document.getElementById('stall-overlay').classList.remove('visible');
+}
+
+/* ── Keyboard shortcut ──────────────────────────────── */
+document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && e.target === document.body) {
+        e.preventDefault();
+        if (ws && ws.readyState === 1) stopSim(); else startSim();
+    }
+});
+
+/* ── Init ───────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+    charts.pitch = mkChart('c-pitch', '#5E6AD2', true);
+    charts.vel   = mkChart('c-vel',   '#8A8F98', true);
+    charts.wind  = mkChart('c-wind',  '#F59E0B', false);
+    setConn('waiting', 'STANDBY');
+    log('AeroShield GCS initialized. Press [SPACE] or click Launch.', 'info');
+});
+</script>
+</body>
+</html>

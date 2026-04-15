@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AeroShield | AI Avionics</title>
-    <!-- Premium Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=JetBrains+Mono:wght@100..800&display=swap" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -30,9 +29,6 @@
                     fontFamily: {
                         sans: ['Inter', 'system-ui', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
-                    },
-                    borderRadius: {
-                        '2xl': '16px',
                     }
                 }
             }
@@ -40,362 +36,347 @@
     </script>
 
     <style>
-        /* BASE STYLES */
         body {
             background-color: #050506;
             color: #EDEDEF;
-            cursor: default;
             overflow-x: hidden;
+            letter-spacing: -0.01em;
         }
 
-        /* LAYERED BACKGROUND SYSTEM */
-        .bg-system {
+        /* PREMIUM DEPTH SYSTEM */
+        .bg-canvas {
             position: fixed;
             inset: 0;
             z-index: -10;
-            background: radial-gradient(ellipse at top, #0a0a0f 0%, #050506 50%, #020203 100%);
+            background: radial-gradient(circle at 50% -20%, #151525 0%, #050506 60%, #020203 100%);
         }
 
-        .noise-layer {
-            position: absolute;
+        .noise {
+            position: fixed;
             inset: 0;
-            opacity: 0.015;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.02;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
             pointer-events: none;
+            z-index: 50;
         }
 
-        .grid-layer {
-            position: absolute;
+        /* ASYMMETRIC GRID LAYER */
+        .grid-blueprint {
+            position: fixed;
             inset: 0;
-            background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-            background-size: 64px 64px;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 80px 80px;
+            mask-image: radial-gradient(circle at 50% 50%, white, transparent 80%);
             pointer-events: none;
+            z-index: -5;
         }
 
-        /* ANIMATED BLOBS */
-        .blob {
-            position: absolute;
-            border-radius: 100%;
-            filter: blur(150px);
-            opacity: 0.2;
-            animation: float 15s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            33% { transform: translate(30px, -50px) rotate(2deg); }
-            66% { transform: translate(-20px, 40px) rotate(-1deg); }
-        }
-
-        /* SPOTLIGHT EFFECT */
-        .card-spotlight {
+        /* LINEAR CARDS */
+        .card-linear {
             position: relative;
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            transition: border-color 0.3s ease;
-        }
-
-        .card-spotlight::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(300px circle at var(--mouse-x) var(--mouse-y), rgba(94, 106, 210, 0.15), transparent 40%);
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            pointer-events: none;
-            border-radius: inherit;
-        }
-
-        .card-spotlight:hover::before {
-            opacity: 1;
-        }
-
-        .card-spotlight:hover {
-            border-color: rgba(255, 255, 255, 0.1);
-        }
-
-        /* TEXT GRADIENTS */
-        .text-gradient {
-            background: linear-gradient(to bottom, #FFFFFF 0%, rgba(255, 255, 255, 0.7) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* BUTTONS */
-        .btn-primary {
-            position: relative;
-            background-color: #5E6AD2;
-            box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.5), 0 4px 12px rgba(94, 106, 210, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
-            overflow: hidden;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-top-color: rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .btn-primary::after {
+        .card-linear:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+            border-top-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* SPOTLIGHT SCRIPT-BASED */
+        .spotlight::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(600px circle at var(--x) var(--y), rgba(94, 106, 210, 0.08), transparent 40%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+            border-radius: inherit;
+        }
+        .spotlight:hover::after { opacity: 1; }
+
+        /* BUTTON SHIMMER */
+        .btn-glow {
+            background: #5E6AD2;
+            color: white;
+            box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.4), 0 0 30px -10px rgba(94, 106, 210, 0.6);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        .btn-glow:hover {
+            background: #6872D9;
+            box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.6), 0 0 40px -5px rgba(94, 106, 210, 0.8);
+            transform: scale(1.02);
+        }
+        .btn-glow:active { transform: scale(0.98); }
+
+        .btn-glow::before {
             content: "";
             position: absolute;
             top: 0; left: -100%;
             width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 4s infinite;
         }
 
-        .btn-primary:hover::after {
-            left: 100%;
+        @keyframes shimmer {
+            0% { left: -100%; }
+            20%, 100% { left: 100%; }
         }
 
-        .btn-primary:hover {
-            background-color: #6872D9;
-            transform: translateY(-1px);
-            box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.6), 0 8px 20px rgba(94, 106, 210, 0.4);
+        /* CUSTOM SELECT */
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='orange' %3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1em;
+            padding-right: 2rem;
         }
 
-        .btn-primary:active {
-            transform: scale(0.98);
+        /* ANIMATION DELAYS */
+        .reveal {
+            opacity: 0;
+            transform: translateY(10px);
+            animation: reveal-anim 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-
-        /* SIMULATION CLASSES */
-        .aircraft-pivot {
-            transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .stall-warning-overlay {
-            animation: pulse-red 1s infinite alternate;
-        }
-
-        @keyframes pulse-red {
-            from { background-color: rgba(239, 68, 68, 0); }
-            to { background-color: rgba(239, 68, 68, 0.1); }
+        @keyframes reveal-anim {
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
-<body class="min-h-screen">
-    <!-- BACKGROUND STACK -->
-    <div class="bg-system">
-        <div class="grid-layer"></div>
-        <div class="noise-layer"></div>
-        <div class="blob bg-accent w-[900px] h-[1200px] top-[-300px] left-[50%] ml-[-450px]" style="animation-delay: -2s;"></div>
-        <div class="blob bg-purple-600 w-[600px] h-[600px] top-[40%] left-[-200px]" style="opacity: 0.1; animation-duration: 20s;"></div>
-        <div class="blob bg-blue-400 w-[500px] h-[500px] bottom-[10%] right-[-100px]" style="opacity: 0.08; animation-duration: 18s; animation-delay: -5s;"></div>
-    </div>
+<body class="selection:bg-accent/30">
+    <div class="noise px-4 sm:px-0"></div>
+    <div class="bg-canvas"></div>
+    <div class="grid-blueprint"></div>
 
-    <!-- MAIN NAV -->
-    <nav class="border-b border-white/[0.06] backdrop-blur-xl sticky top-0 z-50">
-        <div class="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div class="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shadow-[0_0_20px_rgba(94,106,210,0.5)]">
-                    <i class="fas fa-wind text-white text-sm"></i>
+    <!-- BLOBS -->
+    <div class="fixed top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-accent/20 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+    <div class="fixed bottom-[10%] left-[-10%] w-[400px] h-[400px] bg-purple-600/10 blur-[100px] rounded-full pointer-events-none -z-10"></div>
+
+    <!-- NAVIGATION -->
+    <header class="h-20 border-b border-white/[0.06] backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-[1400px] mx-auto h-full px-8 flex items-center justify-between">
+            <div class="flex items-center gap-5">
+                <div class="w-9 h-9 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/20">
+                    <i class="fas fa-microchip text-white text-sm"></i>
                 </div>
                 <div>
-                    <h1 class="text-sm font-bold tracking-tight text-white">AEROSHIELD</h1>
-                    <p class="text-[10px] uppercase tracking-widest text-muted">AI Avionics System</p>
+                    <h1 class="text-sm font-bold tracking-tight text-white/90">AEROSHIELD <span class="text-accent underline underline-offset-4">AVIONICS</span></h1>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-muted font-medium">Stall Prevention Engine v4.0</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-6">
-                <div id="status-badge" class="flex items-center gap-2 px-3 py-1 rounded-full border border-green-500/30 bg-green-500/10 text-[10px] font-bold text-green-400">
-                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> SYSTEM NOMINAL
+            <div class="hidden md:flex items-center gap-8">
+                <div class="flex items-center gap-2 group cursor-help">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    <span class="text-[11px] font-mono text-green-400/80 group-hover:text-green-400 transition-colors">SYSTEM_HEALTH: 100%</span>
                 </div>
-                <div class="h-4 w-[1px] bg-white/10"></div>
-                <button id="playback-btn" class="btn-primary px-5 py-1.5 rounded-lg text-xs font-semibold text-white tracking-wide">
-                    <i class="fas fa-play mr-2"></i> INITIALIZE TEST
+                <button id="playback-btn" class="btn-glow px-6 py-2 rounded-xl text-xs font-bold tracking-wide uppercase">
+                    Initialize Simulation
                 </button>
             </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- CONTENT GRID -->
-    <main class="max-w-[1400px] mx-auto p-6 grid grid-cols-12 auto-rows-auto gap-6">
+    <main class="max-w-[1400px] mx-auto p-8 grid grid-cols-12 gap-6 relative">
         
-        <!-- TOP ROW INFOBAR -->
-        <div class="col-span-12 lg:col-span-8 card-spotlight p-1 rounded-2xl">
-            <div class="bg-bg-elevated/40 backdrop-blur-sm rounded-[14px] p-6 flex flex-wrap gap-8 items-center h-full">
-                <div class="space-y-1">
-                    <p class="text-[10px] text-muted uppercase tracking-widest font-mono">Mission Profile</p>
-                    <select id="scenario-selector" class="bg-transparent text-lg font-semibold text-white outline-none border-0 p-0 cursor-pointer hover:text-accent transition-colors">
-                        <option value="normal" class="bg-bg-elevated">Atmospheric Stability Test</option>
-                        <option value="climb" class="bg-bg-elevated">Aggressive Climb Protocol</option>
-                        <option value="stall" class="bg-bg-elevated">Critical Stall Recovery</option>
+        <!-- CONTROL BAR -->
+        <div class="col-span-12 lg:col-span-8 card-linear p-1 reveal" style="animation-delay: 0.1s;">
+            <div class="p-6 bg-white/[0.01] rounded-[11px] flex items-center gap-10">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] text-muted font-mono uppercase tracking-widest block">Flight Protocol</label>
+                    <select id="scenario-selector" class="bg-transparent text-foreground font-semibold text-lg outline-none cursor-pointer hover:text-white transition-colors">
+                        <option value="normal" class="bg-bg-elevated">Atmospheric Stability (L3)</option>
+                        <option value="climb" class="bg-bg-elevated">High Alpha Climb (L5)</option>
+                        <option value="stall" class="bg-bg-elevated">Neural Stress Test (CRIT)</option>
                     </select>
                 </div>
-                <div class="h-10 w-[1px] bg-white/10 hidden md:block"></div>
-                <div class="space-y-1">
-                    <p class="text-[10px] text-muted uppercase tracking-widest font-mono">Safety Layer</p>
-                    <div class="flex bg-white/5 p-1 rounded-lg border border-white/5 self-center">
-                        <button id="ai-toggle-on" class="px-4 py-1 rounded-md text-[10px] font-bold bg-accent text-white shadow-lg transition-all hover:bg-accent-bright">AI ENABLED</button>
-                        <button id="ai-toggle-off" class="px-4 py-1 rounded-md text-[10px] font-bold text-muted hover:text-white transition-all">MANUAL</button>
+                <div class="h-10 w-px bg-white/5"></div>
+                <div class="space-y-1.5">
+                    <label class="text-[10px] text-muted font-mono uppercase tracking-widest block">Autonomous Assist</label>
+                    <div class="inline-flex bg-white/5 p-1 rounded-xl border border-white/5">
+                        <button id="ai-toggle-on" class="px-5 py-1.5 rounded-lg text-[10px] font-bold bg-white/10 text-white shadow-inner transition-all">AI ENABLED</button>
+                        <button id="ai-toggle-off" class="px-5 py-1.5 rounded-lg text-[10px] font-bold text-muted hover:text-white transition-all">MANUAL</button>
                     </div>
                 </div>
                 <div class="flex-grow"></div>
                 <div class="text-right">
-                    <p class="text-[10px] text-muted uppercase tracking-widest font-mono">Simulation Time</p>
-                    <p id="sim-clock" class="text-2xl font-mono text-white tracking-tighter">00.00 <span class="text-xs text-muted">SEC</span></p>
+                    <span class="text-[10px] text-muted font-mono uppercase block mb-1">MET: T+</span>
+                    <span id="sim-clock" class="text-2xl font-mono tabular-nums text-white">00.00 <span class="opacity-30">S</span></span>
                 </div>
             </div>
         </div>
 
-        <!-- TELEMETRY ARCHITECTURE CARD -->
-        <div class="col-span-12 lg:col-span-4 card-spotlight p-6 rounded-2xl flex flex-col justify-between overflow-hidden">
-            <div id="stall-warning" class="hidden absolute inset-0 stall-warning-overlay z-0"></div>
-            <div class="relative z-10">
-                <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">Neural Architecture</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between py-2 border-b border-white/5">
-                        <span class="text-xs text-muted">Model ID</span>
-                        <span class="text-xs font-mono text-white">RF_STALL_v4.2</span>
-                    </div>
-                    <div class="flex justify-between py-2 border-b border-white/5">
-                        <span class="text-xs text-muted">Sample Set</span>
-                        <span class="text-xs font-mono text-white">6,000 Datapoints</span>
-                    </div>
-                    <div class="flex justify-between py-2 border-b border-white/5">
-                        <span class="text-xs text-muted">Active Trees</span>
-                        <span class="text-xs font-mono text-white">50 estimators</span>
-                    </div>
+        <!-- AI METRICS -->
+        <div class="col-span-12 lg:col-span-4 card-linear p-6 reveal spotlight transition-all" style="animation-delay: 0.2s;">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h3 class="text-xs font-bold text-white/40 uppercase tracking-widest">Inference Core</h3>
+                    <p class="text-[10px] text-accent font-mono mt-1">RANDOM_FOREST_50T</p>
                 </div>
+                <i class="fas fa-bolt text-accent/50 text-xs"></i>
             </div>
             
-            <div class="relative z-10 pt-4">
-                <div class="flex justify-between items-end mb-2">
-                    <p class="text-[10px] text-muted uppercase tracking-widest font-mono">Current Risk</p>
-                    <p id="risk-val" class="text-xl font-mono text-white">0%</p>
+            <div class="space-y-5">
+                <div class="flex justify-between items-end">
+                    <span class="text-[10px] text-muted font-mono">LATENCY (MS)</span>
+                    <span class="text-sm font-mono text-white">0.38</span>
                 </div>
-                <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div id="risk-bar" class="h-full bg-accent w-0 transition-all duration-300"></div>
+                <div class="flex justify-between items-end">
+                    <span class="text-[10px] text-muted font-mono">STALL_PROBABILITY</span>
+                    <span id="risk-val" class="text-sm font-mono text-white">0%</span>
+                </div>
+                <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div id="risk-bar" class="h-full bg-accent w-0 transition-all duration-300 shadow-[0_0_10px_rgba(94,106,210,0.5)]"></div>
                 </div>
             </div>
         </div>
 
-        <!-- MAIN VISUALIZER (BENTO HERO) -->
-        <div class="col-span-12 lg:col-span-8 card-spotlight rounded-2xl h-[500px] relative overflow-hidden group">
-            <!-- HUD Overlays -->
-            <div class="absolute top-6 left-6 flex flex-col gap-1 z-20">
-                <div class="text-[10px] font-mono text-accent uppercase tracking-tighter bg-accent/10 px-2 py-0.5 rounded border border-accent/20 border-l-2 border-l-accent inline-block">Visualizer Active</div>
-            </div>
+        <!-- VISUALIZER (BENTO HERO) -->
+        <div class="col-span-12 lg:col-span-8 card-linear h-[540px] relative overflow-hidden reveal group spotlight" style="animation-delay: 0.3s;">
+            <div class="absolute inset-0 bg-gradient-to-b from-white/[0.01] to-transparent pointer-events-none"></div>
             
-            <!-- Pitch Grid Background -->
-            <div class="absolute inset-0 z-0 opacity-20 pointer-events-none">
-                <svg width="100%" height="100%">
-                    <defs>
-                        <pattern id="pitchGrid" width="100" height="100" patternUnits="userSpaceOnUse">
-                            <line x1="0" y1="50" x2="100" y2="50" stroke="white" stroke-width="0.5" />
-                            <line x1="50" y1="0" x2="50" y2="100" stroke="white" stroke-width="0.5" />
-                        </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#pitchGrid)" />
-                </svg>
+            <!-- HUD ELEMENTS -->
+            <div class="absolute top-8 left-8 flex flex-col gap-4 z-20">
+                <div class="flex items-center gap-3">
+                    <div class="w-2 h-2 rounded-full bg-accent shadow-[0_0_10px_#5E6AD2]"></div>
+                    <span class="text-[10px] font-mono text-white/50 tracking-widest uppercase">HD_VISUALIZER: ON</span>
+                </div>
             </div>
 
-            <!-- Virtual Horizon -->
-            <div id="horizon" class="absolute inset-x-0 top-[50%] h-[1px] bg-white/20 z-0 pointer-events-none"></div>
+            <div class="absolute right-8 top-8 text-right z-20">
+                <div class="text-[10px] font-mono text-muted uppercase">Pitch Angle</div>
+                <div id="pitch-hud" class="text-xl font-mono text-white">0.00°</div>
+            </div>
 
-            <!-- Simulation Rendering -->
-            <div class="absolute inset-0 flex items-center justify-center z-10 pb-12">
-                <div class="aircraft-pivot flex flex-col items-center">
-                    <!-- SVG Aircraft Shadow -->
-                    <div class="opacity-20 blur-md translate-y-12 scale-90">
-                        <svg width="240" height="40" viewBox="0 0 240 40"><ellipse cx="120" cy="20" rx="100" ry="8" fill="black"/></svg>
-                    </div>
-                    <!-- The Aircraft -->
-                    <svg id="aircraft-svg" width="320" height="auto" viewBox="0 0 400 120" class="drop-shadow-[0_20px_50px_rgba(94,106,210,0.4)]">
-                        <!-- High Fidelity Aircraft Asset -->
-                        <g transform="translate(0, 10)">
-                            <!-- Tail -->
-                            <path d="M330,40 L380,5 L395,5 L375,50 Z" fill="#2D314E" />
-                            <path d="M330,40 L380,5 L385,5 L375,45 Z" fill="#5E6AD2" />
-                            <!-- Fuselage Body -->
-                            <path d="M40,65 Q40,40 120,40 L340,45 Q370,45 370,65 L370,75 Q370,90 320,85 L50,85 Q40,85 40,65" fill="#EDEDEF" />
-                            <path d="M40,65 Q40,55 120,55 L340,58 Q360,58 360,65 L360,70 Q360,75 320,74 L50,74 Q40,74 40,65" fill="#fcfcfc" opacity="0.5" />
-                            <!-- Main Wing -->
-                            <path d="M120,65 L220,115 L260,115 L180,65 Z" fill="#3E457F" />
-                            <path d="M130,65 L220,110 L250,110 L180,65 Z" fill="#5E6AD2" />
-                            <!-- Cockpit -->
-                            <path d="M70,55 Q100,25 150,55" fill="#1e293b" opacity="0.8" />
-                            <!-- Engine -->
-                            <rect x="140" y="75" width="60" height="15" rx="4" fill="#0f172a" />
-                            <rect x="145" y="78" width="50" height="9" rx="2" fill="#5E6AD2" opacity="0.2" />
+            <!-- Virtual Horizon Grid -->
+            <div id="horizon" class="absolute inset-0 z-0 opacity-10 pointer-events-none flex flex-col justify-center gap-16 transition-transform duration-150">
+                <div class="h-px w-full bg-white/50"></div>
+                <div class="h-px w-1/2 mx-auto bg-white/30"></div>
+                <div class="h-px w-full bg-white/80 scale-x-110"></div>
+                <div class="h-px w-1/2 mx-auto bg-white/30"></div>
+                <div class="h-px w-full bg-white/50"></div>
+            </div>
+
+            <!-- Aircraft Asset -->
+            <div class="absolute inset-0 flex items-center justify-center z-10">
+                <div class="aircraft-pivot flex flex-col items-center transition-all duration-150">
+                    <svg id="aircraft-svg" width="340" height="120" viewBox="0 0 400 120" class="drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]">
+                        <g transform="translate(0, 5)">
+                            <!-- Tail Fins -->
+                            <path d="M330,40 L385,2 L398,2 L375,45 Z" fill="#1e293b" />
+                            <path d="M330,40 L385,2 L390,2 L375,42 Z" fill="#5E6AD2" />
+                            <!-- Main Fuselage -->
+                            <path d="M40,65 Q40,42 120,42 L340,48 Q375,48 375,65 L375,72 Q375,88 320,83 L50,83 Q40,83 40,65" fill="#f8fafc" />
+                            <path d="M40,65 Q40,50 120,50 L340,55 Q360,55 360,65 L360,68 Q360,78 320,77 L50,77 Q40,77 40,65" fill="#ffffff" opacity="0.4" />
+                            <!-- Wing Structure (Higher Detail) -->
+                            <path d="M120,65 L240,118 L285,118 L190,65 Z" fill="#2d3748" />
+                            <path d="M130,65 L240,114 L275,114 L190,65 Z" fill="#5E6AD2" />
+                            <!-- Cockpit Window -->
+                            <path d="M75,55 Q105,28 155,55" fill="#0f172a" />
+                            <path d="M85,55 Q105,38 135,55" fill="white" opacity="0.1" />
+                            <!-- Engine Module -->
+                            <rect x="145" y="78" width="65" height="18" rx="5" fill="#1e293b" />
+                            <circle cx="210" cy="87" r="4" fill="#5E6AD2" opacity="0.5" />
                         </g>
                     </svg>
                 </div>
             </div>
 
-            <!-- Altitude Meter Overlay -->
-            <div class="absolute right-0 top-0 bottom-0 w-20 flex flex-col justify-center items-center gap-8 z-20 bg-gradient-to-l from-black/40 to-transparent">
-                <div class="text-[10px] font-mono text-muted rotate-90 whitespace-nowrap uppercase tracking-widest mb-12">Flight Envelope</div>
-                <div class="flex flex-col h-[60%] justify-between py-4 border-r border-white/20 mr-12 pr-4 relative">
-                    <div class="text-[10px] font-mono text-white/50">150m</div>
-                    <div class="text-[10px] font-mono text-white/50">125m</div>
-                    <div class="text-[10px] font-mono text-white/50">100m</div>
-                    <div class="text-[10px] font-mono text-white/50">75m</div>
-                    <div id="alt-indicator" class="absolute -right-1 w-4 h-0.5 bg-accent shadow-[0_0_10px_#5E6AD2] transition-all duration-300" style="top: 50%;"></div>
+            <!-- Altitude Meter (Vertical Tape) -->
+            <div class="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white/[0.02] to-transparent z-20 flex items-center justify-center">
+                <div class="relative h-[80%] w-full flex flex-col justify-between py-10">
+                    <div class="absolute right-6 w-8 h-px bg-white/20"></div>
+                    <div class="absolute right-6 top-1/4 w-4 h-px bg-white/10"></div>
+                    <div class="absolute right-6 top-1/2 w-8 h-px bg-white/20"></div>
+                    <div class="absolute right-6 top-3/4 w-4 h-px bg-white/10"></div>
+                    <div class="absolute right-6 bottom-10 w-8 h-px bg-white/20"></div>
+                    <!-- Pointer -->
+                    <div id="alt-indicator" class="absolute right-0 w-16 h-8 flex items-center transition-all duration-300" style="top: 50%;">
+                        <div class="text-[10px] font-mono font-bold text-accent mr-2">100.0m</div>
+                        <div class="w-2 h-2 bg-accent rotate-45 -translate-x-1 shadow-[0_0_10px_#5E6AD2]"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Big Alert Banner -->
-            <div id="alert-banner" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none">
-                <div class="px-8 py-4 bg-red-600 rounded-lg border-2 border-white shadow-[0_0_100px_rgba(239,68,68,0.8)]">
-                    <h2 class="text-3xl font-black italic tracking-tighter text-white animate-pulse">CRITICAL STALL</h2>
+            <!-- CRITICAL ALERT -->
+            <div id="alert-banner" class="hidden absolute inset-0 z-50 pointer-events-none flex items-center justify-center backdrop-blur-[2px]">
+                <div class="px-10 py-6 bg-red-600/90 rounded-2xl border border-white/20 shadow-[0_0_120px_rgba(239,68,68,0.5)] flex flex-col items-center gap-2">
+                    <i class="fas fa-exclamation-triangle text-white animate-bounce"></i>
+                    <h2 class="text-2xl font-black italic tracking-widest text-white">CRITICAL STALL</h2>
+                    <p class="text-[10px] text-white/70 font-mono tracking-widest">AUTONOMOUS RECOVERY ENGAGED</p>
                 </div>
             </div>
         </div>
 
-        <!-- LOG CARD -->
-        <div class="col-span-12 lg:col-span-4 card-spotlight rounded-2xl flex flex-col">
-            <div class="p-6 border-b border-white/5 flex justify-between items-center">
-                <h3 class="text-xs font-bold text-muted uppercase tracking-widest">Real-time Telemetry</h3>
-                <i class="fas fa-terminal text-[10px] text-white/20"></i>
+        <!-- LOG & TELEMETRY -->
+        <div class="col-span-12 lg:col-span-4 card-linear flex flex-col reveal" style="animation-delay: 0.4s;">
+            <div class="p-6 border-b border-white/[0.04] flex justify-between items-center">
+                <h3 class="text-xs font-bold text-white/30 uppercase tracking-widest">Neural Flight Log</h3>
+                <span class="text-[10px] font-mono text-accent">LIVE_TX</span>
             </div>
-            <div id="log-container" class="flex-grow p-6 h-[400px] overflow-y-auto font-mono text-[10px] space-y-4 pr-4">
-                <div class="text-muted italic opacity-50">Awaiting system initialization...</div>
+            <div id="log-container" class="flex-grow p-6 h-[440px] overflow-y-auto font-mono text-[10px] scrollbar-hide space-y-3">
+                <div class="text-muted/40 italic">Awaiting simulation link...</div>
             </div>
         </div>
 
-        <!-- BOTTOM CHART BENTO GRID -->
-        <div class="col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="card-spotlight p-6 rounded-2xl col-span-1 lg:col-span-2 min-h-[280px]">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xs font-bold text-muted uppercase tracking-widest">Dynamic Pitch Analysis</h3>
-                    <span id="raw-pitch" class="text-xs font-mono text-white">0.00°</span>
+        <!-- CHARTS BENTO -->
+        <div class="col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6 reveal" style="animation-delay: 0.5s;">
+            <div class="card-linear p-8 min-h-[300px] spotlight">
+                <div class="flex justify-between items-center mb-8">
+                    <h3 class="text-xs font-bold text-white/40 uppercase tracking-widest">Pitch Trajectory</h3>
+                    <div id="raw-pitch" class="px-2 py-1 bg-white/5 rounded font-mono text-accent text-xs">0.00°</div>
                 </div>
                 <div class="h-[180px]">
                     <canvas id="pitchChart"></canvas>
                 </div>
             </div>
             
-            <div class="card-spotlight p-6 rounded-2xl col-span-1 lg:col-span-2 min-h-[280px]">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xs font-bold text-muted uppercase tracking-widest">Airspeed Velocity</h3>
-                    <span id="raw-vel" class="text-xs font-mono text-white">0.0m/s</span>
+            <div class="card-linear p-8 min-h-[300px] spotlight">
+                <div class="flex justify-between items-center mb-8">
+                    <h3 class="text-xs font-bold text-white/40 uppercase tracking-widest">Airspeed Velocity</h3>
+                    <div id="raw-vel" class="px-2 py-1 bg-white/5 rounded font-mono text-white/80 text-xs">0.0m/s</div>
                 </div>
                 <div class="h-[180px]">
                     <canvas id="velChart"></canvas>
                 </div>
             </div>
         </div>
+
     </main>
 
-    <!-- FOOTER METRICS -->
-    <footer class="max-w-[1400px] mx-auto px-6 py-12 border-t border-white/[0.06] mt-12 grid grid-cols-2 md:grid-cols-4 gap-12">
-        <div>
-            <p class="text-[9px] text-muted uppercase tracking-widest mb-3">Model Accuracy</p>
-            <div class="text-3xl font-light text-white tracking-tight">99.1<span class="text-sm text-accent">%</span></div>
+    <!-- FOOTER STATS -->
+    <footer class="max-w-[1400px] mx-auto px-8 py-16 border-t border-white/[0.06] mt-16 grid grid-cols-2 md:grid-cols-4 gap-12 text-center md:text-left">
+        <div class="space-y-3">
+            <p class="text-[10px] text-muted uppercase tracking-widest font-mono">Decision Accuracy</p>
+            <div class="text-4xl font-light text-white tracking-tighter">99.1<span class="text-sm text-accent">%</span></div>
         </div>
-        <div>
-            <p class="text-[9px] text-muted uppercase tracking-widest mb-3">Response Latency</p>
-            <div class="text-3xl font-light text-white tracking-tight">0.38<span class="text-sm text-accent">ms</span></div>
+        <div class="space-y-3">
+            <p class="text-[10px] text-muted uppercase tracking-widest font-mono">Response Speed</p>
+            <div class="text-4xl font-light text-white tracking-tighter">0.38<span class="text-sm text-accent">ms</span></div>
         </div>
-        <div>
-            <p class="text-[9px] text-muted uppercase tracking-widest mb-3">Stall Reduction</p>
-            <div class="text-3xl font-light text-white tracking-tight">100<span class="text-sm text-accent">%</span></div>
+        <div class="space-y-3">
+            <p class="text-[10px] text-muted uppercase tracking-widest font-mono">Stall Prevention</p>
+            <div class="text-4xl font-light text-white tracking-tighter">100<span class="text-sm text-accent">%</span></div>
         </div>
-        <div>
-            <p class="text-[9px] text-muted uppercase tracking-widest mb-3">Inference Engine</p>
-            <div class="text-sm font-bold text-muted uppercase tracking-wider py-1.5 px-3 bg-white/5 border border-white/10 rounded inline-block mt-2">Numpy Optimized</div>
+        <div class="flex flex-col justify-center items-center md:items-end">
+            <div class="text-[10px] font-bold text-white/40 border border-white/10 px-4 py-2 rounded-xl backdrop-blur-md">
+                FORGE-GRPO OPTIMIZED
+            </div>
         </div>
     </footer>
 
     <script>
-        // GLOBAL STATE
         let telemetryData = null;
         let isPlaying = false;
         let currentIndex = 0;
@@ -404,139 +385,125 @@
         let playbackInterval = null;
         let pitchChart, velChart;
 
-        // ANIMATED SPOTLIGHT HANDLER
-        document.querySelectorAll('.card-spotlight').forEach(card => {
-            card.addEventListener('mousemove', e => {
-                const rect = card.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                card.style.setProperty('--mouse-x', `${x}px`);
-                card.style.setProperty('--mouse-y', `${y}px`);
+        // SPOTLIGHT LOGIC
+        document.querySelectorAll('.spotlight').forEach(el => {
+            el.addEventListener('mousemove', e => {
+                const rect = el.getBoundingClientRect();
+                el.style.setProperty('--x', `${e.clientX - rect.left}px`);
+                el.style.setProperty('--y', `${e.clientY - rect.top}px`);
             });
         });
 
-        // SIMULATION LOGIC
         async function init() {
             try {
-                addLog('CORE', 'Initializing neural flight controller...', 'text-muted');
                 const response = await fetch('outputs/telemetry.json');
                 telemetryData = await response.json();
                 
-                setTimeout(() => {
-                    addLog('SUCCESS', 'Telemetry stream operational.', 'text-accent');
-                    addLog('READY', 'System ready for flight test profiles.', 'text-green-400');
-                    initCharts();
-                    setupEventListeners();
-                }, 800);
+                addLog('CORE', 'Neural flight link established.', 'text-accent');
+                addLog('READY', 'Simulation parameters locked.', 'text-green-400');
+                
+                initCharts();
+                setupEventListeners();
             } catch (e) {
-                addLog('CRITICAL', 'Failed to link telemetry stream.', 'text-red-500');
+                addLog('ERROR', 'Failed to fetch telemetry.json', 'text-red-500');
             }
         }
 
         function initCharts() {
-            const commonOptions = {
+            const chartStyles = {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
                     x: { display: false },
                     y: { 
-                        grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
-                        ticks: { color: '#4B5563', font: { size: 9, family: 'JetBrains Mono' } }
+                        grid: { color: 'rgba(255,255,255,0.02)', drawBorder: false },
+                        ticks: { color: '#444', font: { size: 9, family: 'JetBrains Mono' } }
                     }
                 },
                 plugins: { legend: { display: false } },
                 animation: false,
-                elements: { line: { tension: 0.4 }, point: { radius: 0 } }
+                elements: { line: { tension: 0.35 }, point: { radius: 0 } }
             };
 
             const ctx1 = document.getElementById('pitchChart').getContext('2d');
-            const pitchGradient = ctx1.createLinearGradient(0, 0, 0, 180);
-            pitchGradient.addColorStop(0, 'rgba(94, 106, 210, 0.2)');
-            pitchGradient.addColorStop(1, 'transparent');
+            const g1 = ctx1.createLinearGradient(0, 0, 0, 200);
+            g1.addColorStop(0, 'rgba(94, 106, 210, 0.1)');
+            g1.addColorStop(1, 'transparent');
 
             pitchChart = new Chart(ctx1, {
                 type: 'line',
                 data: {
-                    labels: Array(100).fill(''),
+                    labels: Array(120).fill(''),
                     datasets: [{
-                        data: Array(100).fill(0),
+                        data: Array(120).fill(0),
                         borderColor: '#5E6AD2',
-                        borderWidth: 1.5,
+                        borderWidth: 2,
                         fill: true,
-                        backgroundColor: pitchGradient
+                        backgroundColor: g1
                     }]
                 },
-                options: commonOptions
+                options: chartStyles
             });
 
             const ctx2 = document.getElementById('velChart').getContext('2d');
-            const velGradient = ctx2.createLinearGradient(0, 0, 0, 180);
-            velGradient.addColorStop(0, 'rgba(237, 237, 239, 0.1)');
-            velGradient.addColorStop(1, 'transparent');
+            const g2 = ctx2.createLinearGradient(0, 0, 0, 200);
+            g2.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
+            g2.addColorStop(1, 'transparent');
 
             velChart = new Chart(ctx2, {
                 type: 'line',
                 data: {
-                    labels: Array(100).fill(''),
+                    labels: Array(120).fill(''),
                     datasets: [{
-                        data: Array(100).fill(0),
-                        borderColor: '#8A8F98',
-                        borderWidth: 1.5,
+                        data: Array(120).fill(0),
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        borderWidth: 2,
                         fill: true,
-                        backgroundColor: velGradient
+                        backgroundColor: g2
                     }]
                 },
-                options: commonOptions
+                options: chartStyles
             });
         }
 
         function setupEventListeners() {
-            const playBtn = document.getElementById('playback-btn');
-            const scenarioSel = document.getElementById('scenario-selector');
-            const aiOn = document.getElementById('ai-toggle-on');
-            const aiOff = document.getElementById('ai-toggle-off');
-
-            playBtn.onclick = togglePlayback;
+            document.getElementById('playback-btn').onclick = () => {
+                isPlaying = !isPlaying;
+                const btn = document.getElementById('playback-btn');
+                if (isPlaying) {
+                    btn.innerText = 'Stop Simulation';
+                    btn.classList.replace('bg-accent', 'bg-red-600');
+                    startPlayback();
+                } else {
+                    btn.innerText = 'Initialize Simulation';
+                    btn.classList.replace('bg-red-600', 'bg-accent');
+                    stopPlayback();
+                }
+            };
             
-            scenarioSel.onchange = (e) => {
+            document.getElementById('scenario-selector').onchange = (e) => {
                 currentScenario = e.target.value;
                 resetSim();
             };
 
-            aiOn.onclick = () => {
+            document.getElementById('ai-toggle-on').onclick = () => {
                 aiMode = 'on';
-                aiOn.className = 'px-4 py-1 rounded-md text-[10px] font-bold bg-accent text-white shadow-lg transition-all';
-                aiOff.className = 'px-4 py-1 rounded-md text-[10px] font-bold text-muted hover:text-white transition-all';
+                document.getElementById('ai-toggle-on').classList.add('bg-white/10', 'text-white');
+                document.getElementById('ai-toggle-off').classList.remove('bg-white/10', 'text-white');
                 resetSim();
             };
 
-            aiOff.onclick = () => {
+            document.getElementById('ai-toggle-off').onclick = () => {
                 aiMode = 'off';
-                aiOff.className = 'px-4 py-1 rounded-md text-[10px] font-bold border border-white/20 text-white transition-all';
-                aiOn.className = 'px-4 py-1 rounded-md text-[10px] font-bold text-muted hover:text-white transition-all';
+                document.getElementById('ai-toggle-off').classList.add('bg-white/10', 'text-white');
+                document.getElementById('ai-toggle-on').classList.remove('bg-white/10', 'text-white');
                 resetSim();
             };
-        }
-
-        function togglePlayback() {
-            isPlaying = !isPlaying;
-            const btn = document.getElementById('playback-btn');
-            if (isPlaying) {
-                btn.innerHTML = '<i class="fas fa-pause mr-2"></i> ABORT SIM';
-                btn.classList.add('bg-red-600');
-                btn.classList.remove('bg-accent');
-                startPlayback();
-            } else {
-                btn.innerHTML = '<i class="fas fa-play mr-2"></i> INITIALIZE TEST';
-                btn.classList.remove('bg-red-600');
-                btn.classList.add('bg-accent');
-                stopPlayback();
-            }
         }
 
         function startPlayback() {
             playbackInterval = setInterval(updateFrame, 16);
-            addLog('SYSTEM', `Simulating profile: ${currentScenario}`, 'text-accent');
+            addLog('SYSTEM', `Executing profile: ${currentScenario.toUpperCase()}`, 'text-white');
         }
 
         function stopPlayback() {
@@ -547,35 +514,25 @@
             stopPlayback();
             isPlaying = false;
             currentIndex = 0;
-            const btn = document.getElementById('playback-btn');
-            btn.innerHTML = '<i class="fas fa-play mr-2"></i> INITIALIZE TEST';
-            btn.classList.remove('bg-red-600');
-            btn.classList.add('bg-accent');
+            document.getElementById('playback-btn').innerText = 'Initialize Simulation';
+            document.getElementById('playback-btn').classList.replace('bg-red-600', 'bg-accent');
             updateDisplay(0);
-            
-            pitchChart.data.datasets[0].data = Array(100).fill(0);
-            velChart.data.datasets[0].data = Array(100).fill(0);
-            pitchChart.update('none');
-            velChart.update('none');
-            
             document.getElementById('log-container').innerHTML = '';
-            addLog('SYSTEM', `${currentScenario.toUpperCase()} scenario staged.`, 'text-accent');
+            addLog('STATUS', 'Profile updated. Simulation reset.', 'text-muted');
         }
 
         function updateFrame() {
             const key = aiMode === 'on' ? currentScenario : currentScenario + '_off';
             const data = telemetryData[key];
-            
             if (currentIndex >= data.time.length) {
                 stopPlayback();
                 isPlaying = false;
-                document.getElementById('playback-btn').innerHTML = '<i class="fas fa-redo mr-2"></i> RESTART SESSION';
-                addLog('FINISH', 'Flight data extraction complete.', 'text-green-400');
+                document.getElementById('playback-btn').innerText = 'Restart Session';
+                addLog('FINISH', 'Test sequence completed successfully.', 'text-green-400');
                 return;
             }
-
             updateDisplay(currentIndex);
-            currentIndex += 6;
+            currentIndex += 8;
         }
 
         function updateDisplay(idx) {
@@ -590,67 +547,51 @@
             const isStalled = data.stalled[i];
             const time = data.time[i];
 
-            // 1. Pivot Aircraft
+            // PITCH & HUD
             document.querySelector('.aircraft-pivot').style.transform = `rotate(${-pitch}deg)`;
-            
-            // 2. Horizon Parallax
-            document.getElementById('horizon').style.transform = `translateY(${pitch * 2}px)`;
+            document.getElementById('horizon').style.transform = `translateY(${pitch * 2.5}px) rotate(${pitch * 0.2}deg)`;
+            document.getElementById('pitch-hud').innerText = `${pitch.toFixed(2)}°`;
+            document.getElementById('sim-clock').innerHTML = `${time.toFixed(2)} <span class="opacity-20 uppercase text-xs">s</span>`;
 
-            // 3. UI Labels
-            document.getElementById('sim-clock').innerHTML = `${time.toFixed(2)} <span class="text-xs text-muted">SEC</span>`;
-            document.getElementById('raw-pitch').innerText = pitch.toFixed(2) + '°';
-            document.getElementById('raw-vel').innerText = vel.toFixed(1) + 'm/s';
-            document.getElementById('risk-val').innerText = (prob * 100).toFixed(0) + '%';
-            
-            // 4. Altitude Gauge (Visual only)
+            // STATS
+            document.getElementById('raw-pitch').innerText = `${pitch.toFixed(2)}°`;
+            document.getElementById('raw-vel').innerText = `${vel.toFixed(1)}m/s`;
+            document.getElementById('risk-val').innerText = `${(prob * 100).toFixed(0)}%`;
+            document.getElementById('risk-bar').style.width = `${prob * 100}%`;
+            document.getElementById('risk-bar').style.backgroundColor = prob > 0.7 ? '#EF4444' : '#5E6AD2';
+
+            // ALTITUDE
+            const altIndicator = document.getElementById('alt-indicator');
             const altPerc = 100 - ((alt / 150) * 100);
-            document.getElementById('alt-indicator').style.top = Math.max(0, Math.min(100, altPerc)) + '%';
+            altIndicator.style.top = `${Math.max(0, Math.min(100, altPerc))}%`;
+            altIndicator.children[0].innerText = `${alt.toFixed(1)}m`;
 
-            // 5. Risk Rendering
-            const bar = document.getElementById('risk-bar');
-            bar.style.width = (prob * 100) + '%';
-            if (prob > 0.7) bar.style.backgroundColor = '#EF4444';
-            else bar.style.backgroundColor = '#5E6AD2';
+            // CHARTS
+            updateChart(pitchChart, pitch);
+            updateChart(velChart, vel);
 
-            // 6. Alerts
-            const alert = document.getElementById('alert-banner');
-            const warningLayer = document.getElementById('stall-warning');
-            if (isStalled) {
-                alert.classList.remove('hidden');
-                warningLayer.classList.remove('hidden');
-            } else {
-                alert.classList.add('hidden');
-                warningLayer.classList.add('hidden');
-            }
+            // ALERTS
+            const banner = document.getElementById('alert-banner');
+            if (isStalled) banner.classList.remove('hidden');
+            else banner.classList.add('hidden');
 
-            // 7. Rolling Charts
-            updateRollingChart(pitchChart, pitch);
-            updateRollingChart(velChart, vel);
-
-            // 8. Dynamic Logging
-            if (prob > 0.7 && idx % 36 === 0) {
-                addLog('AI INTERVENING', `High stall risk (${(prob*100).toFixed(0)}%): Suppressing elevator gain.`, 'text-yellow-400');
-            }
-            if (isStalled && idx % 42 === 0) {
-                addLog('ALERT', 'CRITICAL STALL DETECTED - LIFT VOID', 'text-red-500 font-bold');
-            }
+            if (prob > 0.7 && idx % 48 === 0) addLog('AI_ACTION', `Pre-stall phase: Suppressing elevator to 30%.`, 'text-accent');
+            if (isStalled && idx % 48 === 0) addLog('CRITICAL', `Stall condition active. Manual recovery failed.`, 'text-red-500');
         }
 
-        function updateRollingChart(chart, value) {
-            chart.data.datasets[0].data.push(value);
+        function updateChart(chart, val) {
+            chart.data.datasets[0].data.push(val);
             chart.data.datasets[0].data.shift();
             chart.update('none');
         }
 
-        function addLog(tag, msg, colorClass) {
-            const container = document.getElementById('log-container');
+        function addLog(tag, msg, color) {
+            const log = document.getElementById('log-container');
+            const t = telemetryData ? telemetryData[aiMode === 'on' ? currentScenario : currentScenario + '_off'].time[currentIndex] || 0 : 0;
             const div = document.createElement('div');
-            const data = telemetryData ? telemetryData[aiMode === 'on' ? currentScenario : currentScenario + '_off'] : null;
-            const t = data ? data.time[currentIndex] || 0 : 0;
-            
-            div.className = `${colorClass} py-1 border-l-2 border-current pl-3 bg-white/5`;
-            div.innerHTML = `<span class="opacity-40 text-[9px] mr-2 font-mono">${t.toFixed(2)}s</span><span class="font-bold mr-1">${tag}</span> ${msg}`;
-            container.prepend(div);
+            div.className = `${color} border-l-2 border-current pl-3 py-1 bg-white/[0.02]`;
+            div.innerHTML = `<span class="opacity-30 mr-2 text-[8px] tracking-tight">${t.toFixed(2)}S</span> <span class="font-bold mr-1 uppercase">${tag}</span> ${msg}`;
+            log.prepend(div);
         }
 
         init();

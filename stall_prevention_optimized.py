@@ -11,9 +11,102 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
+class DrydenWindModel:
+    """
+    Stochastic wind gust model inspired by the MIL-F-8785C Dryden turbulence model.
+    Simulates both a slowly-varying mean wind and high-frequency Dryden gusts
+    that perturb the aircraft's effective angle of attack and airspeed.
+    """
+
+    def __init__(self, dt=0.01, intensity='moderate', seed=None):
+        """
+        intensity: 'light' | 'moderate' | 'severe'
+        """
+        self.dt = dt
+        if seed is not None:
+            np.random.seed(seed)
+
+        # Scale turbulence by intensity
+        intensity_map = {
+            'light':    {'sigma_w': 0.5,  'sigma_u': 1.0,  'L_w': 50.0},
+            'moderate': {'sigma_w': 1.5,  'sigma_u': 3.0,  'L_w': 100.0},
+            'severe':   {'sigma_w': 4.0,  'sigma_u': 8.0,  'L_w': 200.0},
+        }
+        cfg = intensity_map.get(intensity, intensity_map['moderate'])
+
+        # Dryden PSD parameters (vertical gust component w_g, longitudinal u_g)
+        self.sigma_w = cfg['sigma_w']   # m/s
+        self.sigma_u = cfg['sigma_u']   # m/s
+        self.L_w = cfg['L_w']           # length scale (m)
+
+        # Low-pass Dryden filter states
+        self._w_g = 0.0   # vertical gust state (m/s)
+        self._u_g = 0.0   # longitudinal gust state (m/s)
+        self._mean_wind = 0.0  # slowly varying mean (m/s)
+        self._mean_timer = 0.0
+        self._mean_period = 5.0  # seconds between mean wind shifts
+        self._mean_target = 0.0
+
+    def step(self, V_ref=15.0):
+        """
+        Advance the gust model by one time step.
+        Returns dict with:
+          - u_g: longitudinal (headwind+) gust component (m/s)
+          - w_g: vertical gust component (m/s)  [+ve = upward]
+          - delta_aoa_rad: AoA perturbation (rad) due to w_g
+        """
+        # --- Dryden shaping filter (first-order) ---
+        # Transfer function: H_w(s) = sigma_w * sqrt(2*V/(pi*L)) / (s + V/L)
+        V = max(V_ref, 5.0)
+        tau_w = self.L_w / V
+        tau_u = self.L_w / V
+
+        # White noise excitation
+        noise_w = np.random.randn()
+        noise_u = np.random.randn()
+
+        # Euler update of first-order low-pass Dryden filter
+        sigma_scale_w = self.sigma_w * np.sqrt(2 * V / (np.pi * self.L_w))
+        sigma_scale_u = self.sigma_u * np.sqrt(2 * V / (np.pi * self.L_w))
+
+        self._w_g += self.dt * (-self._w_g / tau_w + sigma_scale_w * noise_w / np.sqrt(self.dt))
+        self._u_g += self.dt * (-self._u_g / tau_u + sigma_scale_u * noise_u / np.sqrt(self.dt))
+
+        # Clamp to physically credible limits
+        self._w_g = np.clip(self._w_g, -15.0, 15.0)
+        self._u_g = np.clip(self._u_g, -20.0, 20.0)
+
+        # --- Slowly varying mean wind component ---
+        self._mean_timer += self.dt
+        if self._mean_timer >= self._mean_period:
+            self._mean_timer = 0.0
+            self._mean_period = np.random.uniform(3.0, 8.0)
+            self._mean_target = np.random.uniform(-3.0, 3.0)
+        # Smoothly track target
+        self._mean_wind += 0.1 * (self._mean_target - self._mean_wind)
+
+        u_total = self._u_g + self._mean_wind
+
+        # AoA perturbation: arctan(w_g / V)  ≈ w_g/V for small angles
+        delta_aoa_rad = np.arctan2(self._w_g, max(V, 5.0))
+
+        return {
+            'u_g': u_total,
+            'w_g': self._w_g,
+            'delta_aoa_rad': delta_aoa_rad,
+        }
+
+    def reset(self):
+        self._w_g = 0.0
+        self._u_g = 0.0
+        self._mean_wind = 0.0
+        self._mean_timer = 0.0
+        self._mean_target = 0.0
+
+
 class AircraftFlightModel:
-    
-    def __init__(self, dt=0.01):
+
+    def __init__(self, dt=0.01, wind_intensity='moderate', wind_enabled=True):
         self.dt = dt
         self.rho = 1.225
         self.S = 0.18
@@ -28,6 +121,11 @@ class AircraftFlightModel:
         
         self.critical_aoa = 15.0
         self.stalled = False
+
+        # Wind model
+        self.wind_enabled = wind_enabled
+        self.wind_model = DrydenWindModel(dt=dt, intensity=wind_intensity, seed=99)
+        self.wind_speed = 0.0  # last sampled u_g (m/s)
         
     def compute_cl(self, aoa):
         aoa_deg = np.degrees(aoa)
@@ -52,37 +150,51 @@ class AircraftFlightModel:
         return np.clip(cd_0 + cd_alpha, 0.01, 2.0)
     
     def step(self, elevator_input, throttle_input):
-        
+
         self.velocity = np.clip(self.velocity, 5.0, 30.0)
-        
-        aoa = self.pitch - np.arctan2(0, self.velocity) if self.velocity > 0 else self.pitch
-        aoa = np.clip(aoa, np.radians(-20), np.radians(25))
-        
+
+        # --- Dryden Wind Gust Perturbation ---
+        if self.wind_enabled:
+            gust = self.wind_model.step(V_ref=self.velocity)
+            effective_velocity = self.velocity + gust['u_g']
+            aoa_wind_offset = gust['delta_aoa_rad']
+            self.wind_speed = gust['u_g']
+        else:
+            effective_velocity = self.velocity
+            aoa_wind_offset = 0.0
+            self.wind_speed = 0.0
+
+        effective_velocity = np.clip(effective_velocity, 5.0, 35.0)
+
+        # AoA includes wind-induced perturbation
+        aoa = self.pitch + aoa_wind_offset
+        aoa = np.clip(aoa, np.radians(-20), np.radians(30))
+
         cl = self.compute_cl(aoa)
         cd = self.compute_cd(aoa)
-        
-        q_dynamic = 0.5 * self.rho * (self.velocity ** 2) * self.S
+
+        q_dynamic = 0.5 * self.rho * (effective_velocity ** 2) * self.S
         lift = q_dynamic * cl
         drag = q_dynamic * cd
-        
+
         thrust = 5.0 + throttle_input * 15.0
-        
+
         vertical_accel = (lift * np.cos(self.pitch) - drag * np.sin(self.pitch) - self.mass * self.g) / self.mass
         horizontal_accel = (thrust - drag * np.cos(self.pitch) - lift * np.sin(self.pitch)) / self.mass
-        
+
         self.velocity += horizontal_accel * self.dt
         self.altitude += (self.velocity * np.sin(self.pitch) + vertical_accel * self.dt * np.sin(self.pitch)) * self.dt
-        
+
         moment = (elevator_input * 2.0) - (self.pitch_rate * 0.1)
         pitch_accel = moment / self.Iy
-        
+
         self.pitch_rate += pitch_accel * self.dt
         self.pitch += self.pitch_rate * self.dt
         self.pitch = np.clip(self.pitch, np.radians(-45), np.radians(45))
-        
+
         aoa_deg = np.degrees(aoa)
         self.stalled = aoa_deg > self.critical_aoa
-        
+
         return {
             'pitch': self.pitch,
             'pitch_rate': self.pitch_rate,
@@ -91,7 +203,8 @@ class AircraftFlightModel:
             'lift': lift,
             'drag': drag,
             'altitude': self.altitude,
-            'stalled': self.stalled
+            'stalled': self.stalled,
+            'wind_speed': self.wind_speed,
         }
     
     def reset(self):
@@ -100,6 +213,8 @@ class AircraftFlightModel:
         self.velocity = 15.0
         self.altitude = 100.0
         self.stalled = False
+        self.wind_speed = 0.0
+        self.wind_model.reset()
 
 
 class DatasetGenerator:
@@ -275,7 +390,8 @@ class SimulationEnvironment:
             'stalled': [],
             'elevator': [],
             'throttle': [],
-            'altitude': []
+            'altitude': [],
+            'wind_speed': [],
         }
     
     def run(self, duration=20, scenario='normal'):
@@ -290,7 +406,8 @@ class SimulationEnvironment:
             'stalled': [],
             'elevator': [],
             'throttle': [],
-            'altitude': []
+            'altitude': [],
+            'wind_speed': [],
         }
         
         self.aircraft.reset()
@@ -361,6 +478,7 @@ class SimulationEnvironment:
             self.history['elevator'].append(elevator_cmd)
             self.history['throttle'].append(throttle_cmd)
             self.history['altitude'].append(state['altitude'])
+            self.history['wind_speed'].append(state.get('wind_speed', 0.0))
             
             time += self.aircraft.dt
             step += 1
