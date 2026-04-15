@@ -519,6 +519,16 @@ let cht={}, logCt=0;
 let fpsF=0, fpsT=0;
 const N=120;
 
+// ── rAF decoupling: WS writes here, rAF reads here ──────────────
+let latestFrame=null;   // last frame received from WebSocket
+let rafRunning=false;   // whether rAF loop is active
+let chartDirty=false;   // whether chart data needs flushing
+let lastChartFlush=0;   // timestamp of last chart update
+const CHART_INTERVAL=150; // ms between chart redraws (≈7 Hz)
+
+// ── Cached DOM references (set in init) ──────────────────────────
+let $={};
+
 /* ── Spotlight ─────────────────── */
 document.querySelectorAll('.card').forEach(c=>{
   c.addEventListener('mousemove',e=>{
@@ -528,33 +538,45 @@ document.querySelectorAll('.card').forEach(c=>{
   });
 });
 
-/* ── Charts ────────────────────── */
+/* ── Chart factory ─────────────── */
 function mkChart(id,col,fill){
   const ctx=document.getElementById(id).getContext('2d');
   const g=ctx.createLinearGradient(0,0,0,72);
-  g.addColorStop(0,col.replace(')',',0.18)').replace('rgb','rgba'));
-  g.addColorStop(1,'transparent');
+  const rgba=col+'33'; // 20% opacity fill
   return new Chart(ctx,{
     type:'line',
     data:{labels:Array(N).fill(''),datasets:[{data:Array(N).fill(null),
-      borderColor:col,borderWidth:1.8,fill:fill,backgroundColor:fill?g:'transparent',
-      pointRadius:0,tension:.38}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,
+      borderColor:col,borderWidth:1.8,fill:fill,
+      backgroundColor:fill?rgba:'transparent',
+      pointRadius:0,tension:.4,
+      // Tell Chart.js the line is already pre-filtered
+      spanGaps:true
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:false,  // zero JS animation overhead
       plugins:{legend:{display:false}},
-      scales:{x:{display:false},
-        y:{grid:{color:'rgba(255,255,255,.025)',drawBorder:false},
-          ticks:{color:'#555',font:{size:8,family:'JetBrains Mono'}},
-          // Use adaptive scaling so data fills the visible area
+      scales:{
+        x:{display:false},
+        y:{grid:{color:'rgba(255,255,255,.02)',drawBorder:false},
+          ticks:{color:'#555',font:{size:8,family:'JetBrains Mono'},maxTicksLimit:4},
           afterDataLimits(scale){
-            const range=scale.max-scale.min;
-            if(range<1){scale.min-=1;scale.max+=1;}
+            const r=scale.max-scale.min;
+            if(r<1){scale.min-=0.5;scale.max+=0.5;}
           }
         }
-      }
+      },
+      // Decimation speeds up rendering for dense datasets
+      plugins:{decimation:{enabled:true,algorithm:'lttb',samples:60}}
     }
   });
 }
-function push(c,v){c.data.datasets[0].data.push(v);c.data.datasets[0].data.shift();c.update('none');}
+// Accumulate chart data without redrawing (rAF calls flush)
+function pushChart(c,v){
+  c.data.datasets[0].data.push(v);
+  c.data.datasets[0].data.shift();
+  chartDirty=true;
+}
 
 /* ── UI helpers ────────────────── */
 function setConn(cls,txt){
@@ -599,67 +621,105 @@ function setWind(v){
   else{btn.style.background='';btn.style.color='';btn.style.borderColor='';}
 }
 
-/* ── Render ────────────────────── */
-function render(d){
-  const pitch=d.pitch, vel=d.velocity, alt=d.altitude, prob=d.stall_prob, wind=d.wind_u, t=d.t;
+/* ── rAF render loop ─────────────
+   Runs at ~60fps, reads latestFrame, batches all DOM writes.
+   Chart flushed on CHART_INTERVAL (150ms) only.
+─────────────────────────────────── */
+function rafLoop(now){
+  if(!rafRunning) return;
+  requestAnimationFrame(rafLoop);
 
-  /* Aircraft */
-  document.getElementById('acwrap').style.transform=`rotate(${-pitch}deg)`;
-  document.getElementById('hgrid').style.transform=`translateY(${pitch*3}px) rotate(${pitch*.15}deg)`;
+  if(!latestFrame) return;
+  const d=latestFrame;
+  const pitch=d.pitch, vel=d.velocity, alt=d.altitude,
+        prob=d.stall_prob, wind=d.wind_u, t=d.t;
 
-  /* HUD */
+  // ── Aircraft (GPU-composited transform) ──────────────────────
+  $.acwrap.style.transform=`rotate(${-pitch}deg)`;
+  $.hgrid.style.transform=`translateY(${pitch*2.5}px) rotate(${pitch*.12}deg)`;
+
+  // ── HUD text ──────────────────────────────────────────────────
   const hiPitch=Math.abs(pitch)>14, hiProb=prob>.7;
-  document.getElementById('h-pitch').textContent=`${pitch.toFixed(2)}°`;
-  document.getElementById('h-pitch').className=`h-val${hiPitch?' hi':''}`;
-  document.getElementById('h-aoa').textContent=`${d.aoa.toFixed(2)}°`;
-  document.getElementById('h-vel').textContent=`${vel.toFixed(1)} m/s`;
-  document.getElementById('h-thr').textContent=`${(d.throttle*100).toFixed(0)}%`;
-  document.getElementById('h-prob').textContent=`${(prob*100).toFixed(0)}%`;
-  document.getElementById('h-prob').className=`h-val${hiProb?' hi':''}`;
-  document.getElementById('met').textContent=`T+ ${t.toFixed(2)} S`;
+  $.hPitch.textContent=`${pitch.toFixed(2)}°`;
+  $.hPitch.className=`h-val${hiPitch?' hi':''}`;
+  $.hAoa.textContent=`${d.aoa.toFixed(2)}°`;
+  $.hVel.textContent=`${vel.toFixed(1)} m/s`;
+  $.hThr.textContent=`${(d.throttle*100).toFixed(0)}%`;
+  $.hProb.textContent=`${(prob*100).toFixed(0)}%`;
+  $.hProb.className=`h-val${hiProb?' hi':''}`;
+  $.met.textContent=`T+ ${t.toFixed(2)} S`;
 
-  /* Prob bar */
-  const pf=document.getElementById('prob-fill');
-  pf.style.width=`${prob*100}%`;
-  pf.style.background=prob>.7?'var(--danger)':prob>.4?'var(--warn)':'var(--accent)';
+  // ── Prob bar ──────────────────────────────────────────────────
+  $.probFill.style.width=`${prob*100}%`;
+  $.probFill.style.background=prob>.7?'var(--danger)':prob>.4?'var(--warn)':'var(--accent)';
 
-  /* Wind bar */
-  const wn=wind/20; // -1..1
-  const wf=document.getElementById('w-fill');
-  if(wn>=0){wf.style.left='50%';wf.style.width=`${Math.min(wn*50,50)}%`;wf.style.background='#F59E0B';}
-  else{wf.style.left=`${Math.max(50+wn*50,0)}%`;wf.style.width=`${Math.min(-wn*50,50)}%`;wf.style.background='#60A5FA';}
-  document.getElementById('w-val').textContent=wind.toFixed(1);
+  // ── Wind bar ──────────────────────────────────────────────────
+  const wn=wind/20;
+  if(wn>=0){
+    $.wFill.style.left='50%';
+    $.wFill.style.width=`${Math.min(wn*50,50)}%`;
+    $.wFill.style.background='#F59E0B';
+  } else {
+    $.wFill.style.left=`${Math.max(50+wn*50,0)}%`;
+    $.wFill.style.width=`${Math.min(-wn*50,50)}%`;
+    $.wFill.style.background='#60A5FA';
+  }
+  $.wVal.textContent=wind.toFixed(1);
 
-  /* Alt tape */
+  // ── Alt tape ──────────────────────────────────────────────────
   const af=1-Math.min(Math.max((alt-60)/100,0),1);
-  document.getElementById('alt-ptr').style.top=`${af*84+8}%`;
-  document.getElementById('alt-val').textContent=`${alt.toFixed(0)}m`;
+  $.altPtr.style.top=`${af*84+8}%`;
+  $.altVal.textContent=`${alt.toFixed(0)}m`;
 
-  /* Stall overlay */
-  document.getElementById('stall-veil').className=`stall-veil${d.stalled?' on':''}`;
+  // ── Stall overlay ─────────────────────────────────────────────
+  const sv=$.stallVeil;
+  if(d.stalled && !sv.classList.contains('on'))  sv.classList.add('on');
+  if(!d.stalled && sv.classList.contains('on'))  sv.classList.remove('on');
 
-  /* Charts */
-  push(cht.pitch,pitch);push(cht.vel,vel);push(cht.wind,wind);
-  document.getElementById('cv-pitch').textContent=`${pitch.toFixed(2)}°`;
-  document.getElementById('cv-vel').textContent=vel.toFixed(1);
-  document.getElementById('cv-wind').textContent=wind.toFixed(2);
+  // ── Charts — flush only every CHART_INTERVAL ms ───────────────
+  pushChart(cht.pitch,pitch);
+  pushChart(cht.vel,vel);
+  pushChart(cht.wind,wind);
+  $.cvPitch.textContent=`${pitch.toFixed(2)}°`;
+  $.cvVel.textContent=vel.toFixed(1);
+  $.cvWind.textContent=wind.toFixed(2);
+  if(chartDirty && now-lastChartFlush>CHART_INTERVAL){
+    cht.pitch.update('none');
+    cht.vel.update('none');
+    cht.wind.update('none');
+    chartDirty=false;
+    lastChartFlush=now;
+  }
 
-  /* Stats */
+  // ── Live stats ────────────────────────────────────────────────
   if(d.stalled) stats.stalls++;
-  if(prob>stats.peak){stats.peak=prob;document.getElementById('s-peak').innerHTML=`${(prob*100).toFixed(0)}<sup>%</sup>`;}
-  if(alt<stats.minAlt){stats.minAlt=alt;document.getElementById('s-alt').innerHTML=`${alt.toFixed(1)}<sup>m</sup>`;}
-  document.getElementById('s-stalls').innerHTML=`${stats.stalls}<sup> CT</sup>`;
+  if(prob>stats.peak){
+    stats.peak=prob;
+    $.sPeak.innerHTML=`${(prob*100).toFixed(0)}<sup>%</sup>`;
+  }
+  if(alt<stats.minAlt){
+    stats.minAlt=alt;
+    $.sAlt.innerHTML=`${alt.toFixed(1)}<sup>m</sup>`;
+  }
+  $.sStalls.innerHTML=`${stats.stalls}<sup> CT</sup>`;
 
-  /* FPS */
-  fpsF++;const now=performance.now();
-  if(now-fpsT>=1000){document.getElementById('fps-ctr').textContent=`${fpsF} fps`;fpsF=0;fpsT=now;}
+  // ── FPS counter ───────────────────────────────────────────────
+  fpsF++;
+  if(now-fpsT>=1000){
+    $.fpsCtr.textContent=`${fpsF} fps`;
+    fpsF=0;fpsT=now;
+  }
 
-  /* Selective logs — rate-limited to avoid spam */
-  const slot=Math.round(t*5); // 5 slots/sec
+  // ── Selective logs ────────────────────────────────────────────
+  const slot=Math.round(t*5);
   if(hiProb && slot%4===0) addLog(`AI override @T+${t.toFixed(1)}s — prob ${(prob*100).toFixed(0)}%`,'w',t);
-  if(d.stalled && slot%6===0) addLog(`STALL active — AoA critical`,'e',t);
+  if(d.stalled && slot%6===0) addLog('STALL active — AoA critical','e',t);
   if(Math.abs(wind)>6 && slot%8===0) addLog(`Gust u_g=${wind.toFixed(1)} m/s`,'i',t);
+
+  // Clear so we don't re-render same frame
+  latestFrame=null;
 }
+
 
 /* ── Sim control ───────────────── */
 function startSim(){
@@ -671,7 +731,12 @@ function startSim(){
   document.getElementById('ring-fg').style.strokeDashoffset='113.1';
   document.getElementById('lbody').innerHTML='';
   logCt=0;document.getElementById('lcnt').textContent='0 EVENTS';
-  Object.values(cht).forEach(c=>{c.data.datasets[0].data=Array(N).fill(null);c.update('none');});
+  // Reset chart buffers
+  Object.values(cht).forEach(c=>{
+    c.data.datasets[0].data=Array(N).fill(null);
+    c.update('none');
+  });
+  chartDirty=false;latestFrame=null;
 
   setConn('live','CONNECTING…');
   addLog('Requesting live simulation from AeroShield server…','i');
@@ -683,12 +748,16 @@ function startSim(){
     document.getElementById('btn-stop').style.display='';
     addLog(`▶ Launched — ${cfg.scenario.toUpperCase()} | AI:${cfg.ai} | Wind:${cfg.wind}`,'o');
     ws.send(JSON.stringify({scenario:cfg.scenario,ai_enabled:cfg.ai,wind:cfg.wind}));
+    // Start rAF loop
+    rafRunning=true;
+    fpsT=performance.now();
+    requestAnimationFrame(rafLoop);
   };
   ws.onmessage=e=>{
     const d=JSON.parse(e.data);
-    if(d.type==='frame') render(d);
-    else if(d.type==='done'){
-      // Calculate prevention rate from actual captured stalls
+    if(d.type==='frame'){
+      latestFrame=d; // Just store it — rAF will render it
+    } else if(d.type==='done'){
       const maxExpectedStalls={normal:20,climb:200,stall:900};
       const baseline=maxExpectedStalls[cfg.scenario]||200;
       const prevented=Math.max(0,baseline-stats.stalls);
@@ -707,6 +776,8 @@ function startSim(){
 function stopSim(){if(ws)ws.close();addLog('Simulation aborted.','w');endSim();}
 
 function endSim(){
+  rafRunning=false;
+  latestFrame=null;
   setConn('standby','STANDBY');
   document.getElementById('btn-go').style.display='';
   document.getElementById('btn-stop').style.display='none';
@@ -723,6 +794,34 @@ document.addEventListener('keydown',e=>{
 
 /* ── Init ──────────────────────── */
 window.addEventListener('DOMContentLoaded',()=>{
+  // Cache all DOM references once
+  $={
+    acwrap:   document.getElementById('acwrap'),
+    hgrid:    document.getElementById('hgrid'),
+    hPitch:   document.getElementById('h-pitch'),
+    hAoa:     document.getElementById('h-aoa'),
+    hVel:     document.getElementById('h-vel'),
+    hThr:     document.getElementById('h-thr'),
+    hProb:    document.getElementById('h-prob'),
+    met:      document.getElementById('met'),
+    probFill: document.getElementById('prob-fill'),
+    wFill:    document.getElementById('w-fill'),
+    wVal:     document.getElementById('w-val'),
+    altPtr:   document.getElementById('alt-ptr'),
+    altVal:   document.getElementById('alt-val'),
+    stallVeil:document.getElementById('stall-veil'),
+    cvPitch:  document.getElementById('cv-pitch'),
+    cvVel:    document.getElementById('cv-vel'),
+    cvWind:   document.getElementById('cv-wind'),
+    sStalls:  document.getElementById('s-stalls'),
+    sPeak:    document.getElementById('s-peak'),
+    sAlt:     document.getElementById('s-alt'),
+    fpsCtr:   document.getElementById('fps-ctr'),
+  };
+  // GPU compositing hint for the aircraft
+  $.acwrap.style.willChange='transform';
+  $.hgrid.style.willChange='transform';
+
   cht.pitch=mkChart('c-pitch','#5E6AD2',true);
   cht.vel  =mkChart('c-vel'  ,'#8A8F98',true);
   cht.wind =mkChart('c-wind' ,'#F59E0B',false);

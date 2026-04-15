@@ -32,10 +32,10 @@ from stall_prevention_optimized import (
 )
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-STREAM_EVERY_N_STEPS = 2   # send one frame per 2 physics steps = 50 Hz
+STREAM_EVERY_N_STEPS = 4   # 25 Hz over WebSocket — smooth but not flooding
 DT = 0.01
 DURATION = 20.0
-FRAME_INTERVAL = STREAM_EVERY_N_STEPS * DT  # 0.02 s
+FRAME_INTERVAL = STREAM_EVERY_N_STEPS * DT  # 0.04 s
 BASE_DIR = pathlib.Path(__file__).parent
 
 # ── One-time model training at startup ─────────────────────────────────────────
