@@ -32,9 +32,12 @@ from stall_prevention_optimized import (
 )
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-STREAM_EVERY_N_STEPS = 5   # send one WebSocket frame per N physics steps
+STREAM_EVERY_N_STEPS = 3   # send one WebSocket frame per N physics steps (~33 Hz)
 DT = 0.01                  # physics integration timestep (s)
 DURATION = 20.0            # simulation duration (s)
+# Real-time pacing: each physics frame = DT seconds of real time.
+# We send every N steps, so each send should wait N*DT seconds.
+FRAME_INTERVAL = STREAM_EVERY_N_STEPS * DT  # 0.03 s → ~33 fps
 BASE_DIR = pathlib.Path(__file__).parent
 
 # ── One-time model training at startup ─────────────────────────────────────────
@@ -104,6 +107,7 @@ async def simulate(websocket: WebSocket):
         step = 0
         total_steps = int(DURATION / DT)
         stall_count = 0
+        loop_start = asyncio.get_event_loop().time()  # wall-clock reference
 
         while step < total_steps:
             # Pilot profile
@@ -121,8 +125,9 @@ async def simulate(websocket: WebSocket):
                     elevator_base, throttle_base = 0.60, 0.20
                 else:
                     elevator_base, throttle_base = 0.10, 0.60
-            else:   # normal
-                elevator_base, throttle_base = 0.00, 0.50
+            else:   # normal — gentle sinusoidal pitch to make aircraft visibly move
+                elevator_base = 0.12 * math.sin(time * 0.8)   # slow wave ±0.12
+                throttle_base = 0.50
 
             # AI override
             if ai_enabled and STALL_MODEL.is_trained:
@@ -165,8 +170,17 @@ async def simulate(websocket: WebSocket):
                     "wind_u":     round(state.get("wind_speed", 0.0), 3),
                 }
                 await websocket.send_json(frame)
-                # Yield control so FastAPI can process other coroutines
-                await asyncio.sleep(0)
+
+                # ── Real-time pacing ──────────────────────────────────────────
+                # Calculate when this frame *should* have arrived in wall time,
+                # then sleep the remaining gap so playback matches 1:1 physics time.
+                target_wall = loop_start + time
+                now = asyncio.get_event_loop().time()
+                sleep_for = target_wall - now
+                if sleep_for > 0:
+                    await asyncio.sleep(sleep_for)
+                else:
+                    await asyncio.sleep(0)  # always yield to event loop
 
             time += DT
             step += 1
