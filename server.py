@@ -32,12 +32,10 @@ from stall_prevention_optimized import (
 )
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-STREAM_EVERY_N_STEPS = 3   # send one WebSocket frame per N physics steps (~33 Hz)
-DT = 0.01                  # physics integration timestep (s)
-DURATION = 20.0            # simulation duration (s)
-# Real-time pacing: each physics frame = DT seconds of real time.
-# We send every N steps, so each send should wait N*DT seconds.
-FRAME_INTERVAL = STREAM_EVERY_N_STEPS * DT  # 0.03 s → ~33 fps
+STREAM_EVERY_N_STEPS = 2   # send one frame per 2 physics steps = 50 Hz
+DT = 0.01
+DURATION = 20.0
+FRAME_INTERVAL = STREAM_EVERY_N_STEPS * DT  # 0.02 s
 BASE_DIR = pathlib.Path(__file__).parent
 
 # ── One-time model training at startup ─────────────────────────────────────────
@@ -120,14 +118,17 @@ async def simulate(websocket: WebSocket):
                     elevator_base, throttle_base = 0.10, 0.40
             elif scenario == "stall":
                 if time < 3:
-                    elevator_base, throttle_base = 0.10, 0.60
-                elif time < 8:
-                    elevator_base, throttle_base = 0.60, 0.20
+                    elevator_base, throttle_base = 0.15, 0.65
+                elif time < 7:
+                    elevator_base, throttle_base = 0.75, 0.15  # hard nose-up, throttle cut
+                elif time < 12:
+                    elevator_base, throttle_base = 0.55, 0.10  # sustained stall
                 else:
-                    elevator_base, throttle_base = 0.10, 0.60
-            else:   # normal — gentle sinusoidal pitch to make aircraft visibly move
-                elevator_base = 0.12 * math.sin(time * 0.8)   # slow wave ±0.12
-                throttle_base = 0.50
+                    elevator_base, throttle_base = 0.10, 0.65  # recovery attempt
+            else:   # normal — visible sinusoidal pilot input, AI damps but doesn't fully cancel
+                # Use a larger amplitude so pitch visibly swings ±8-10° even when AI is on
+                elevator_base = 0.30 * math.sin(time * 0.7) + 0.08 * math.sin(time * 1.8)
+                throttle_base = 0.45  # slightly below mid to prevent velocity pinning at max
 
             # AI override
             if ai_enabled and STALL_MODEL.is_trained:

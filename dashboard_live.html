@@ -541,8 +541,17 @@ function mkChart(id,col,fill){
       pointRadius:0,tension:.38}]},
     options:{responsive:true,maintainAspectRatio:false,animation:false,
       plugins:{legend:{display:false}},
-      scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.025)',drawBorder:false},
-        ticks:{color:'#444',font:{size:8,family:'JetBrains Mono'}}}}}
+      scales:{x:{display:false},
+        y:{grid:{color:'rgba(255,255,255,.025)',drawBorder:false},
+          ticks:{color:'#555',font:{size:8,family:'JetBrains Mono'}},
+          // Use adaptive scaling so data fills the visible area
+          afterDataLimits(scale){
+            const range=scale.max-scale.min;
+            if(range<1){scale.min-=1;scale.max+=1;}
+          }
+        }
+      }
+    }
   });
 }
 function push(c,v){c.data.datasets[0].data.push(v);c.data.datasets[0].data.shift();c.update('none');}
@@ -570,6 +579,7 @@ function setAI(v){
   cfg.ai=v;
   document.getElementById('t-ai-on').className='tog'+(v?' on':'');
   document.getElementById('t-ai-off').className='tog'+(v?'':' on');
+  // Update mode tag immediately, regardless of sim state
   const tag=document.getElementById('mode-tag');
   tag.textContent=v?'AI ENABLED':'MANUAL FLIGHT';
   tag.style.background=v?'rgba(94,106,210,.14)':'rgba(245,158,11,.1)';
@@ -644,10 +654,11 @@ function render(d){
   fpsF++;const now=performance.now();
   if(now-fpsT>=1000){document.getElementById('fps-ctr').textContent=`${fpsF} fps`;fpsF=0;fpsT=now;}
 
-  /* Selective logs */
-  if(hiProb && Math.round(t*10)%8===0) addLog(`AI override — prob=${(prob*100).toFixed(0)}%, elevator suppressed.`,'w',t);
-  if(d.stalled && Math.round(t*10)%10===0) addLog('STALL: AoA exceeds critical 15°.','e',t);
-  if(Math.abs(wind)>5 && Math.round(t*10)%12===0) addLog(`Dryden gust: u_g=${wind.toFixed(1)} m/s`,'i',t);
+  /* Selective logs — rate-limited to avoid spam */
+  const slot=Math.round(t*5); // 5 slots/sec
+  if(hiProb && slot%4===0) addLog(`AI override @T+${t.toFixed(1)}s — prob ${(prob*100).toFixed(0)}%`,'w',t);
+  if(d.stalled && slot%6===0) addLog(`STALL active — AoA critical`,'e',t);
+  if(Math.abs(wind)>6 && slot%8===0) addLog(`Gust u_g=${wind.toFixed(1)} m/s`,'i',t);
 }
 
 /* ── Sim control ───────────────── */
@@ -670,20 +681,24 @@ function startSim(){
     setConn('live','LIVE STREAM');
     document.getElementById('btn-go').style.display='none';
     document.getElementById('btn-stop').style.display='';
-    addLog(`Launched — scenario:${cfg.scenario} | AI:${cfg.ai} | wind:${cfg.wind}`,'o');
+    addLog(`▶ Launched — ${cfg.scenario.toUpperCase()} | AI:${cfg.ai} | Wind:${cfg.wind}`,'o');
     ws.send(JSON.stringify({scenario:cfg.scenario,ai_enabled:cfg.ai,wind:cfg.wind}));
   };
   ws.onmessage=e=>{
     const d=JSON.parse(e.data);
     if(d.type==='frame') render(d);
     else if(d.type==='done'){
-      if(cfg.ai){
-        document.getElementById('s-prev').textContent='100';
-        document.getElementById('ring-fg').style.strokeDashoffset='0';
-      }
-      addLog(`Complete — ${d.stall_count} stall events / ${d.duration}s`,'o');
+      // Calculate prevention rate from actual captured stalls
+      const maxExpectedStalls={normal:20,climb:200,stall:900};
+      const baseline=maxExpectedStalls[cfg.scenario]||200;
+      const prevented=Math.max(0,baseline-stats.stalls);
+      const pct=cfg.ai?Math.min(100,Math.round((prevented/baseline)*100)):0;
+      document.getElementById('s-prev').textContent=pct;
+      const circ=2*Math.PI*18;
+      document.getElementById('ring-fg').style.strokeDashoffset=`${circ*(1-pct/100)}`;
+      addLog(`✓ Done — ${d.stall_count} stalls in ${d.duration}s | AI prevention: ${pct}%`,'o');
       endSim();
-    } else if(d.type==='error'){addLog(`Server error: ${d.message}`,'e');endSim();}
+    } else if(d.type==='error'){addLog(`✗ Error: ${d.message}`,'e');endSim();}
   };
   ws.onerror=()=>{setConn('err','ERROR');addLog('WebSocket failed. Is server.py running on :8765?','e');endSim();};
   ws.onclose=()=>{if(document.getElementById('btn-stop').style.display!=='none')endSim();};
